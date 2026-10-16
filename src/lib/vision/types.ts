@@ -1,5 +1,6 @@
 // 识图结果统一格式。所有数值都是模型估算值，前端保存前允许用户修改。
-export type FoodItem = { name: string; portion: string; calories: number };
+// grams 为模型估计的重量（克），0 表示无法判断。
+export type FoodItem = { name: string; grams: number; calories: number; protein_g: number; carbs_g: number; fat_g: number };
 
 export type FoodAnalysis = {
   title: string;

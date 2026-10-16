@@ -27,7 +27,9 @@ export function parseAnalysis(content: string, provider: string, model: string):
         const item = raw as Record<string, unknown>;
         const itemCalories = numberValue(item?.calories);
         if (typeof item?.name !== "string" || itemCalories === null) return [];
-        return [{ name: item.name.trim().slice(0, 60), portion: typeof item.portion === "string" ? item.portion.trim().slice(0, 40) : "", calories: itemCalories }];
+        // 兼容旧格式 portion: "约200g"
+        const grams = numberValue(item.grams) ?? numberValue(String(item.portion ?? "").match(/(\d+(?:\.\d+)?)\s*(?:g|克)/i)?.[1]) ?? 0;
+        return [{ name: item.name.trim().slice(0, 60), grams, calories: itemCalories, protein_g: numberValue(item.protein_g) ?? 0, carbs_g: numberValue(item.carbs_g) ?? 0, fat_g: numberValue(item.fat_g) ?? 0 }];
       }).slice(0, 12)
     : [];
   const confidence = result.confidence === "high" || result.confidence === "low" ? result.confidence : "medium";

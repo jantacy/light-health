@@ -7,8 +7,8 @@ const systemPrompt = `你是饮食记录助手。根据照片和/或用户给出
 - 照片里没有食物且没有菜名时，title 填"未识别到食物"，各数值填 0，confidence 填 low。
 只返回一个 JSON 对象，不要输出其他文字，字段：
 title（简短中文菜名，多道菜用顿号连接）、calories（总热量 kcal）、protein_g、carbs_g、fat_g（克）、
-items（数组，每项 {name, portion（如"约200g"、"1碗"）, calories}）、confidence（high/medium/low）、notes（一句话说明估算依据或不确定点）。
-示例：{"title":"番茄炒蛋、米饭","calories":620,"protein_g":20,"carbs_g":85,"fat_g":22,"items":[{"name":"番茄炒蛋","portion":"约200g","calories":330},{"name":"米饭","portion":"1碗约150g","calories":290}],"confidence":"medium","notes":"用油量按家常做法估算"}`;
+items（数组，按食物逐项列出，每项 {name, grams（估计重量，克，数字）, calories, protein_g, carbs_g, fat_g}；顶层 calories 等是各项之和）、confidence（high/medium/low）、notes（一句话说明估算依据或不确定点）。
+示例：{"title":"番茄炒蛋、米饭","calories":620,"protein_g":20,"carbs_g":85,"fat_g":22,"items":[{"name":"番茄炒蛋","grams":200,"calories":330,"protein_g":16,"carbs_g":20,"fat_g":21},{"name":"米饭","grams":150,"calories":290,"protein_g":4,"carbs_g":65,"fat_g":1}],"confidence":"medium","notes":"用油量按家常做法估算"}`;
 
 export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: string; apiKey: string; model: string }): VisionProvider {
   return {
@@ -17,7 +17,7 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
     async analyze({ image, mime, hint }: AnalyzeInput) {
       const text = image
         ? hint ? `用户确认这道菜是「${hint}」，以这个菜名为准，结合照片判断份量并估算营养。` : "识别这张饮食照片，估算整份餐食的营养。"
-        : `没有照片。按「${hint}」的常见一人份估算营养，title 用这个菜名。`;
+        : `没有照片。估算「${hint}」的营养；写了重量就严格按这个重量计算，没写就按常见一人份。title 用这个名称，items 只列这一项。`;
       const userContent: unknown[] = [{ type: "text", text }];
       if (image) userContent.push({ type: "image_url", image_url: { url: `data:${mime};base64,${image.toString("base64")}` } });
       const response = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -27,7 +27,7 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
         body: JSON.stringify({
           model: opts.model,
           temperature: 0.1,
-          max_tokens: 800,
+          max_tokens: 4000, // 模型会先推理，推理 token 也计入上限
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent }

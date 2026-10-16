@@ -167,3 +167,39 @@ button.meal-thumb{border:0;padding:0}
 .welcome h1{margin-top:6px}
 @media(min-width:700px){.welcome{padding-top:28px}}
 @media(max-width:500px){.welcome{padding-top:16px}}
+
+/* 食物项：名称 | 重量 | 热量 | 确认 | 删除 */
+.dish-summary{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.dish-summary strong{font-size:14px;color:#34473b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dish-summary small{font-size:11px;color:#869488}
+.item-table{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.item-head,.item-row{display:grid;grid-template-columns:minmax(0,1fr) 64px 58px 30px 20px;gap:6px;align-items:center}
+.item-head span{font-size:10px;color:#9aa69c}
+.item-name,.item-grams input{width:100%;min-width:0;border:1px solid #e6ebe3;border-radius:9px;padding:7px 8px;font-size:14px;color:#34473b;background:#fbfcfa;outline:none}
+.item-name:focus,.item-grams input:focus{border-color:#8da88d}
+.item-grams{position:relative;display:block}
+.item-grams input{padding-right:18px}
+.item-grams small{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:11px;color:#9aa69c;pointer-events:none}
+.item-kcal{font-size:13px;font-weight:600;color:#34473b;white-space:nowrap;text-align:right}
+.item-kcal small{font-size:10px;font-weight:400;color:#9aa69c}
+.item-row.dirty .item-kcal{color:#b8865a;font-size:11px;font-weight:500}
+.item-confirm{width:30px;height:30px;border-radius:50%;border:1.5px solid #c9d8c6;background:#fff;color:#9db89c;display:grid;place-items:center;padding:0}
+.item-row.dirty .item-confirm{border-color:var(--green);background:var(--green);color:#fff;box-shadow:0 0 0 3px #315f4d22}
+.item-row.error .item-confirm{border-color:#b0655d;color:#b0655d}
+.item-confirm:disabled{cursor:default}
+.item-row.ok .item-confirm{border-color:#9db89c;background:#eef4ec;color:var(--green)}
+.item-remove{border:0;background:transparent;color:#b3bcb5;padding:0;display:grid;place-items:center;height:30px}
+.item-error{grid-column:1/-1;margin:0;font-size:11px;color:#b0655d}
+.item-add{margin-top:8px;border:0;background:transparent;color:var(--green);font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:3px;padding:2px 0}
+
+/* 摄入卡片：日期切换放右上角，整体高度压到约 3/4 */
+.summary-card,.summary-card[class]{padding:16px 20px 15px}
+.summary-head h2{margin:0;font-size:16px}
+.summary-card .date-pill{background:#ffffff18;border-color:#ffffff26;color:#e8f0e6;padding:5px 8px;font-size:12px;gap:6px;margin:0;position:relative;z-index:1}
+.summary-card .date-pill .date-dot{background:#d9e4c5}
+.summary-card .date-pill button{color:#e8f0e6}
+.calorie-line{margin:12px 0 10px}
+.calorie-line strong,.summary-card .calorie-line strong{font-size:34px}
+.macro-grid{margin-top:12px}
+.macro{gap:3px}
+.macro strong{font-size:17px}
