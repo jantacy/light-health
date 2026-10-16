@@ -59,6 +59,14 @@
 
 照片营养估算是近似值，尤其是份量、酱料和烹饪用油。API 故障不影响手动录入。
 
+## 食物库
+
+估算顺序：手机本地（7 天有效）→ 服务端 `food_library`（每 100 克营养，所有用户共享）→ AI。AI 文字估算和识图得到的新食物会自动入库，已有的不覆盖。
+
+- 每保存一条饮食记录，触发器按食物名称累加 `uses`；每满 N 次标记 `needs_refresh`。
+- 服务端每 30 分钟认领待更新的食物，让 AI 按"名称，100克"重估，新旧值各取一半。
+- N 在 `app_settings` 表里，默认 30。修改：`update public.app_settings set value = '50' where key = 'food_refresh_every';`（立即生效，不用重新部署）
+
 ## 部署（server1 主 / server2 备）
 
 线上地址 `https://meal.example.com`。DNS 是 Cloudflare 代理的 CNAME → `www.example.com`，双机切换时随 www 一起切，不需要改 HA 脚本。

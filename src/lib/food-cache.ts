@@ -1,10 +1,12 @@
 // 本地食物库：确认过的食物按“每 100 克的营养”存在本机，换算重量或再次输入同名食物时不用联网。
+// 7 天后过期，重新从服务端食物库取（服务端会定期重估常用食物）。
 export type Per100 = { calories: number; protein_g: number; carbs_g: number; fat_g: number };
 export type Nutrients = Per100;
 
 const KEY = "light-meal:foods";
 const MAX = 300;
-const norm = (name: string) => name.trim().toLowerCase();
+const TTL = 7 * 86400000;
+const norm = (name: string) => name.replace(/\s+/g, "").toLowerCase(); // 与服务端 normName 一致
 
 function read(): Record<string, Per100 & { t: number }> {
   try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; }
@@ -20,7 +22,8 @@ export function rememberFood(name: string, grams: number, n: Nutrients) {
 }
 
 export function lookupFood(name: string): Per100 | null {
-  return read()[norm(name)] ?? null;
+  const hit = read()[norm(name)];
+  return hit && Date.now() - hit.t < TTL ? hit : null;
 }
 
 export const scale = (per100: Per100, grams: number): Nutrients => {

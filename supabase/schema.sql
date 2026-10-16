@@ -120,3 +120,40 @@ create table if not exists public.food_library (
 );
 alter table public.food_library enable row level security;
 -- No client policies: server-only.
+
+-- 应用配置（键值对，仅服务端/SQL 修改）。food_refresh_every：同一食物每被使用多少次触发一次 AI 重估。
+create table if not exists public.app_settings (key text primary key, value text not null, updated_at timestamptz not null default now());
+alter table public.app_settings enable row level security;
+insert into public.app_settings (key, value) values ('food_refresh_every', '30') on conflict (key) do nothing;
+
+-- 食物使用次数：每保存一条饮食记录，按其中食物名称累加；每满 N 次（app_settings.food_refresh_every）标记待更新，由服务端定时让 AI 重估。
+alter table public.food_library add column if not exists uses integer not null default 0;
+alter table public.food_library add column if not exists needs_refresh boolean not null default false;
+alter table public.food_library add column if not exists refreshed_at timestamptz;
+
+create or replace function public.count_food_uses() returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  every integer := coalesce((select nullif(value, '')::integer from public.app_settings where key = 'food_refresh_every'), 30);
+begin
+  if every < 1 then every := 30; end if;
+  update public.food_library f
+     set uses = f.uses + c.n,
+         needs_refresh = f.needs_refresh or (f.uses % every) + c.n >= every
+    from (select lower(regexp_replace(i->>'name', '\s+', '', 'g')) as k, count(*) as n
+            from jsonb_array_elements(coalesce(new.dishes, '[]'::jsonb)) d,
+                 jsonb_array_elements(coalesce(d->'items', '[]'::jsonb)) i
+           group by 1) c
+   where f.name = c.k;
+  return new;
+end $$;
+drop trigger if exists meal_records_count_food_uses on public.meal_records;
+create trigger meal_records_count_food_uses after insert on public.meal_records for each row execute function public.count_food_uses();
+
+-- 服务端认领待更新的食物（多台服务器同时跑也不会重复处理）。
+create or replace function public.claim_food_refresh(max_rows integer default 10) returns setof public.food_library language sql security definer set search_path = public as $$
+  update public.food_library set needs_refresh = false
+   where name in (select name from public.food_library where needs_refresh order by uses desc limit max_rows for update skip locked)
+  returning *;
+$$;
+revoke all on function public.claim_food_refresh(integer) from public, anon, authenticated;
+revoke all on function public.count_food_uses() from public, anon, authenticated;
