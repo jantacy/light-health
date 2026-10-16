@@ -10,6 +10,7 @@ import Trends from "./trends";
 import DateField from "./date-field";
 import PhotoViewer from "./photo-viewer";
 import SettingsModal from "./settings-modal";
+import Splash, { refreshQuotes } from "./splash";
 
 const GOAL = 2000;
 
@@ -22,7 +23,7 @@ function writeCache(key: string, value: unknown) {
 
 export default function Home() {
   const [supabase] = useState(createClient);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<any>(undefined); // undefined：还在读取登录状态，显示启动页
   const [phoneInput, setPhoneInput] = useState("");
   const [licenseInput, setLicenseInput] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
@@ -43,7 +44,8 @@ export default function Home() {
   const date = selectedDate;
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    refreshQuotes();
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
@@ -121,6 +123,8 @@ export default function Home() {
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><div className="brand-mark"><Leaf size={23}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
 
+  if (session === undefined) return <Splash/>;
+
   if (!session) return <main className="auth-screen"><div className="auth-card"><div className="brand-mark"><Leaf size={24}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>好好吃饭，<br/>慢慢记录。</h1><p className="auth-copy">输入受邀手机号和对应的专属 License，打开你的私人饮食记录空间。</p><form onSubmit={signInWithLicense} className="auth-form"><label htmlFor="login-phone">手机号</label><input id="login-phone" type="tel" autoComplete="tel" required placeholder="13800000000" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)}/><label htmlFor="license">License</label><input id="license" type="password" autoComplete="current-password" required placeholder="输入你收到的 License" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)}/><button className="primary-button" type="submit" disabled={loggingIn}>{loggingIn ? "正在验证…" : "登录"} <ChevronRight size={18}/></button></form>{authMessage && <p className="form-message">{authMessage}</p>}<p className="tiny-note">手机号与 License 必须匹配</p></div><div className="auth-decoration"><span>01</span><i/><span>照顾身体，从一餐开始</span></div></main>;
 
   return <main className="app-shell">
@@ -135,7 +139,7 @@ export default function Home() {
       </section>
       <section className="section weight-section"><div className="section-heading"><div><span className="eyebrow">GENTLE PROGRESS</span><h2>体重记录</h2></div><div className="weight-current"><Scale size={17}/><strong>{currentWeight ? `${currentWeight}` : "—"}</strong><small>kg</small></div></div><DateField value={weightDate} onChange={setWeightDate}/><form className="weight-form" onSubmit={saveWeight}><input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder="体重 kg" value={weightInput} onChange={(e) => setWeightInput(e.target.value)}/><button type="submit">记录体重</button></form>{weights.length > 1 ? <div className="weight-history">{weights.slice().reverse().map((w) => <span key={w.id}><i style={{ height: `${Math.max(15, Math.min(70, (w.weight_kg - 35) * 2))}px` }}/><small>{shortDate(w.recorded_on)}</small></span>)}</div> : <p className="weight-hint">轻轻记录，不必追求每天都变化。</p>}</section>
       </>}
-      <footer>慢慢来，身体会记得你的用心。 <span>·</span> 仅你和受邀的人可见</footer>
+      <footer>慢慢来，身体会记得你的用心。</footer>
     </div>
     {!editing && !showSettings && <nav className="tabbar"><button className={tab === "day" ? "active" : ""} onClick={() => setTab("day")}><Sun size={19}/>每日</button><button className="tab-add" aria-label="记录一餐" onClick={() => setEditing("new")}><Plus size={22}/></button><button className={tab === "trends" ? "active" : ""} onClick={() => setTab("trends")}><BarChart3 size={19}/>趋势</button></nav>}
     {editing && <MealModal supabase={supabase} userId={session.user.id} date={tab === "day" ? date : todayISO()} initial={editing === "new" ? undefined : editing} photoUrls={photoUrls} onSaved={mealSaved} onDeleted={mealDeleted} onClose={() => setEditing(null)}/>}

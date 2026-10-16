@@ -140,3 +140,13 @@ button.meal-thumb{border:0;padding:0}
 .line-chart-axis span:first-child{transform:none}
 .line-chart-axis span:last-child{transform:translateX(-100%)}
 .date-field svg{flex:none;width:16px;height:16px}
+
+/* 启动页：读取登录状态期间显示，和 iOS 启动图保持一致 */
+.splash{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:24px;background:radial-gradient(ellipse at 50% 30%,#edf1e8 0,transparent 60%),var(--paper);text-align:center}
+.splash-brand{display:flex;flex-direction:column;align-items:center;gap:14px;color:var(--green)}
+.splash-brand .brand-mark{width:64px;height:64px;border-radius:21px}
+.splash-brand strong{font-size:22px;letter-spacing:.12em}
+.splash-quote{margin:0;max-width:300px;min-height:1.6em;font-family:var(--serif);font-size:16px;line-height:1.6;color:#5f7064;animation:splash-in .5s ease both}
+.splash-dot{width:6px;height:6px;border-radius:50%;background:#9db89c;animation:splash-pulse 1.2s ease-in-out infinite}
+@keyframes splash-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes splash-pulse{0%,100%{opacity:.3}50%{opacity:1}}
