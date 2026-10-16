@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { Camera, Check, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { compressImage } from "@/lib/image";
 import { rememberPhoto } from "@/lib/photo-cache";
+import { lookupFood, rememberFood, scale } from "@/lib/food-cache";
 import { todayISO } from "@/lib/date";
 import type { Dish, DishItem, Meal } from "@/lib/types";
 import type { FoodAnalysis, FoodItem } from "@/lib/vision/types";
@@ -27,6 +28,8 @@ type ItemDraft = {
   fat_g: number;
   state: "ok" | "dirty" | "computing" | "error";
   message?: string;
+  baseName: string; // 上次确认时的名称和重量：只改重量时按比例在本地换算
+  baseGrams: number;
 };
 
 function guessMealType(): Meal["meal_type"] {
@@ -50,7 +53,10 @@ const sum = <T extends { calories: number; protein_g: number; carbs_g: number; f
   list.reduce((t, x) => ({ calories: t.calories + x.calories, protein_g: t.protein_g + x.protein_g, carbs_g: t.carbs_g + x.carbs_g, fat_g: t.fat_g + x.fat_g }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
 
 function itemDraft(i: Partial<DishItem> & { name: string }, photoKey: string | null, state: ItemDraft["state"] = "ok"): ItemDraft {
-  return { key: newKey(), photoKey, name: i.name, grams: i.grams ? String(Math.round(i.grams)) : "", calories: Number(i.calories ?? 0), protein_g: Number(i.protein_g ?? 0), carbs_g: Number(i.carbs_g ?? 0), fat_g: Number(i.fat_g ?? 0), state };
+  const grams = i.grams ? Math.round(i.grams) : 0;
+  const n = { calories: Number(i.calories ?? 0), protein_g: Number(i.protein_g ?? 0), carbs_g: Number(i.carbs_g ?? 0), fat_g: Number(i.fat_g ?? 0) };
+  if (state === "ok") rememberFood(i.name, grams, n);
+  return { key: newKey(), photoKey, name: i.name, grams: grams ? String(grams) : "", ...n, state, baseName: state === "ok" ? i.name.trim() : "", baseGrams: state === "ok" ? grams : 0 };
 }
 
 function draftsFrom(meal: Meal | undefined, photoUrls: Record<string, string>) {
@@ -101,12 +107,11 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
   const analyzing = photos.filter((p) => p.status === "analyzing");
   const working = analyzing.length > 0 || items.some((i) => i.state === "computing");
 
-  async function callAnalyze(photo: File | undefined, hint: string | undefined): Promise<FoodAnalysis> {
+  async function callAnalyze(photo: File): Promise<FoodAnalysis> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("登录状态已失效，请重新登录。");
     const body = new FormData();
-    if (photo) body.append("image", photo);
-    if (hint) body.append("hint", hint);
+    body.append("image", photo);
     const response = await fetch("/api/analyze", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body });
     const a = await response.json().catch(() => ({ error: "识图服务暂时不可用，请稍后重试或手动填写。" }));
     if (!response.ok) throw new Error(a.error || "识别暂不可用");
@@ -120,7 +125,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
       try {
         const photo = await compressImage(file);
         updatePhoto(key, { photo, preview: URL.createObjectURL(photo) });
-        const a = await callAnalyze(photo, undefined);
+        const a = await callAnalyze(photo);
         const found = a.items.length ? a.items.map((i: FoodItem) => itemDraft(i, key)) : [itemDraft({ name: a.title, calories: a.calories, protein_g: a.protein_g, carbs_g: a.carbs_g, fat_g: a.fat_g }, key)];
         setItems((list) => [...list, ...found]);
         updatePhoto(key, { status: "idle" });
@@ -133,18 +138,30 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
     setItems((list) => list.filter((i) => i.photoKey !== key));
   }
 
-  // 确认：名称为空则删除这一行；否则按名称+重量重算。
+  // 确认：名称为空 → 删除这一行；只改了重量 → 按比例本地换算；本地食物库有这个名称 → 本地换算；否则问 AI（只走语言模型）。
   async function confirmItem(item: ItemDraft) {
     const name = item.name.trim();
     if (!name) { setItems((list) => list.filter((i) => i.key !== item.key)); return; }
+    const grams = Number(item.grams) || 0;
+    const done = (n: { calories: number; protein_g: number; carbs_g: number; fat_g: number }, g: number) => {
+      rememberFood(name, g, n);
+      updateItem(item.key, { ...n, grams: g ? String(g) : "", state: "ok", message: undefined, baseName: name, baseGrams: g });
+    };
+    if (grams > 0 && name === item.baseName && item.baseGrams > 0) {
+      const f = grams / item.baseGrams;
+      return done({ calories: item.calories * f, protein_g: item.protein_g * f, carbs_g: item.carbs_g * f, fat_g: item.fat_g * f }, grams);
+    }
+    const cached = grams > 0 ? lookupFood(name) : null;
+    if (cached) return done(scale(cached, grams), grams);
+
     updateItem(item.key, { state: "computing", message: undefined });
     try {
-      const grams = Number(item.grams) || 0;
-      const a = await callAnalyze(undefined, grams ? `${name}，${grams}克` : name);
-      updateItem(item.key, {
-        state: "ok", calories: a.calories, protein_g: a.protein_g, carbs_g: a.carbs_g, fat_g: a.fat_g,
-        grams: grams ? String(grams) : a.items[0]?.grams ? String(Math.round(a.items[0].grams)) : ""
-      });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("登录状态已失效，请重新登录。");
+      const response = await fetch("/api/estimate", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ name, grams }) });
+      const r = await response.json().catch(() => ({ error: "AI 估算暂时不可用，请稍后重试。" }));
+      if (!response.ok) throw new Error(r.error || "AI 估算失败");
+      done({ calories: r.calories, protein_g: r.protein_g, carbs_g: r.carbs_g, fat_g: r.fat_g }, grams || Math.round(r.grams) || 0);
     } catch (err) { updateItem(item.key, { state: "error", message: err instanceof Error ? err.message : "估算失败，请重试" }); }
   }
 
@@ -236,7 +253,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
         {!items.length && !analyzing.length && <p className="food-empty">拍照后自动识别，识别出几种食物就列几行。</p>}
         <button type="button" className="food-add" onClick={() => setItems((list) => [...list, itemDraft({ name: "" }, null, "dirty")])}><Plus size={14}/> 添加食物</button>
       </div>
-      {items.length > 0 && <p className="analysis-disclaimer">名称或重量不对就直接改，再点 ✓ 重新计算；清空名称再点后面的按钮可删除这一行。</p>}
+      {items.length > 0 && <p className="analysis-disclaimer">名称或重量不对就直接改，再点 ✓ 重新计算（只改重量会在本地直接换算）；清空名称再点后面的按钮可删除这一行。</p>}
 
       {items.length > 0 && <div className="meal-total"><span>合计</span><strong>{Math.round(totals.calories)}<small> kcal</small></strong><span>蛋白 {Math.round(totals.protein_g)}g · 碳水 {Math.round(totals.carbs_g)}g · 脂肪 {Math.round(totals.fat_g)}g</span></div>}
 

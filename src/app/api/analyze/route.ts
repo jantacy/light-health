@@ -1,11 +1,10 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { requireLicense } from "@/lib/require-license";
 import { getVisionProvider, VisionError } from "@/lib/vision";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // 前端已把照片（含 iPhone HEIC）缩到 1600px 并转成 JPEG，这里只按文件头确认确实是图片。
 function imageMime(b: Buffer) {
@@ -17,45 +16,20 @@ function imageMime(b: Buffer) {
 
 export async function POST(request: Request) {
   const provider = getVisionProvider();
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!provider) return NextResponse.json({ error: "识图服务尚未配置，请在服务端填写 VISION_API_KEY。" }, { status: 503 });
-  if (!url || !anonKey) return NextResponse.json({ error: "登录服务尚未配置。" }, { status: 503 });
-
-  const authorization = request.headers.get("authorization") || "";
-  const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!token) return NextResponse.json({ error: "请先登录后再使用识图。" }, { status: 401 });
-
-  try {
-    const auth = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data, error } = await auth.auth.getUser(token);
-    if (error || !data.user) return NextResponse.json({ error: "登录状态已失效，请重新登录。" }, { status: 401 });
-
-    const admin = createAdminClient();
-    const { data: license, error: licenseError } = await admin.from("user_licenses").select("id").eq("user_id", data.user.id).eq("status", "active").maybeSingle();
-    if (licenseError) throw licenseError;
-    if (!license) return NextResponse.json({ error: "账号授权已失效，请联系管理员。" }, { status: 403 });
-  } catch {
-    return NextResponse.json({ error: "暂时无法验证账号授权，请稍后重试。" }, { status: 503 });
-  }
+  const denied = await requireLicense(request);
+  if (denied) return denied;
 
   const form = await request.formData().catch(() => null);
   const image = form?.get("image");
-  const rawHint = form?.get("hint");
-  const hint = typeof rawHint === "string" ? rawHint.trim().slice(0, 100) : "";
-  let bytes: Buffer | undefined;
-  let mime: string | undefined;
-  if (image instanceof File) {
-    if (image.size > 4 * 1024 * 1024) return NextResponse.json({ error: "图片不能超过 4 MB。" }, { status: 413 });
-    bytes = Buffer.from(await image.arrayBuffer());
-    mime = imageMime(bytes) ?? undefined;
-    if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
-  } else if (!hint) {
-    return NextResponse.json({ error: "请上传照片或填写菜名。" }, { status: 400 });
-  }
+  if (!(image instanceof File)) return NextResponse.json({ error: "请先选择一张照片。" }, { status: 400 });
+  if (image.size > 4 * 1024 * 1024) return NextResponse.json({ error: "图片不能超过 4 MB。" }, { status: 413 });
+  const bytes = Buffer.from(await image.arrayBuffer());
+  const mime = imageMime(bytes);
+  if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
 
   try {
-    const analysis = await provider.analyze({ image: bytes, mime, hint: hint || undefined });
+    const analysis = await provider.analyze({ image: bytes, mime });
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message }, { status: err.status });
