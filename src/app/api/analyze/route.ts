@@ -53,6 +53,6 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message }, { status: err.status });
     console.error("[analyze]", err);
-    return NextResponse.json({ error: "识图连接暂时失败，请稍后重试或手动填写。" }, { status: 502 });
+    return NextResponse.json({ error: "识图连接暂时失败，请稍后重试或手动填写。" }, { status: 503 });
   }
 }

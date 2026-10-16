@@ -72,7 +72,7 @@ export default function MealModal({ supabase, userId, date, initial, initialImag
       if (!session) throw new Error("登录状态已失效，请重新登录。");
       const body = new FormData(); body.append("image", photo);
       const response = await fetch("/api/analyze", { method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({ error: "识图服务暂时不可用，请稍后重试或手动填写。" }));
       if (!response.ok) throw new Error(result.error || "识别暂不可用");
       const a = result as FoodAnalysis;
       setAnalysis(a);

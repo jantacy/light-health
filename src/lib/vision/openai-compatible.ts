@@ -34,18 +34,19 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
           ]
         })
       });
+      // 用 503 而非 502：Cloudflare 会把源站 502/504 换成自己的非 JSON 错误页。
       if (!response.ok) {
         console.error(`[vision:${opts.name}] HTTP ${response.status}`, (await response.text().catch(() => "")).slice(0, 500));
         if (response.status === 429) throw new VisionError("识图服务繁忙，请稍后重试。", 503);
-        throw new VisionError("暂时无法完成识图，请稍后重试或手动填写。", 502);
+        throw new VisionError("暂时无法完成识图，请稍后重试或手动填写。", 503);
       }
       const payload = await response.json();
       const content = payload?.choices?.[0]?.message?.content;
-      if (typeof content !== "string" || !content.trim()) throw new VisionError("识图结果为空，请重试或手动填写。", 502);
+      if (typeof content !== "string" || !content.trim()) throw new VisionError("识图结果为空，请重试或手动填写。", 503);
       const analysis = parseAnalysis(content, opts.name, opts.model);
       if (!analysis) {
         console.error(`[vision:${opts.name}] unparseable content`, content.slice(0, 500));
-        throw new VisionError("识图返回的数据格式不完整，请重试或手动填写。", 502);
+        throw new VisionError("识图返回的数据格式不完整，请重试或手动填写。", 503);
       }
       return analysis;
     }

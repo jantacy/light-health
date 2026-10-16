@@ -68,7 +68,7 @@ export default function Home() {
     e.preventDefault(); setLoggingIn(true); setAuthMessage("正在验证 License…");
     try {
       const response = await fetch("/api/auth/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: phoneInput.trim(), license: licenseInput.trim() }) });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({ error: "登录服务暂时不可用，请稍后再试。" }));
       if (!response.ok) throw new Error(result.error || "License 无效");
       const { error } = await supabase.auth.setSession({ access_token: result.access_token, refresh_token: result.refresh_token });
       if (error) throw error;

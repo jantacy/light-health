@@ -15,7 +15,7 @@ export default function LicenseAdminPage() {
     e.preventDefault(); setBusy(true); setLicense(""); setMessage(""); setCopied(false);
     try {
       const response = await fetch("/api/admin/licenses", { method: "POST", headers: { "Content-Type": "application/json", "x-license-admin-key": secret }, body: JSON.stringify({ phone: phone.trim() }) });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({ error: "签发服务暂时不可用，请稍后再试。" }));
       if (!response.ok) throw new Error(result.error || "签发失败");
       setLicense(result.license); setMessage(`已为 ${result.phone} 签发。此 License 只会显示这一次。`);
     } catch (err) { setMessage(err instanceof Error ? err.message : "签发失败"); }
