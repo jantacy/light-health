@@ -1,104 +1,162 @@
-# 轻食记 · 私人饮食 PWA
+# 轻食记 · 私人饮食记录 PWA
 
-为 3–10 位受邀用户设计的移动端饮食与体重记录工具。包含 License 登录、今日饮食汇总、餐食照片上传、营养数据手动修正、体重记录，以及 AI 识图的服务端接入位置。页面适配 iPhone Safari，可添加到主屏幕。
+给 3–10 位受邀用户用的饮食和体重记录工具：拍照识别食物、AI 估算热量和三大营养素、按天汇总和看趋势。主要在 iPhone Safari 上使用，可以添加到主屏幕当 App 用。
 
-## License 规则
-
-- 管理员打开 `/admin/licenses`，输入手机号（11 位大陆号码或 +国家码，服务端统一为 E.164）和 `LICENSE_ADMIN_SECRET`，由服务端生成 License。
-- 每个手机号至多对应一条有效 License。重新签发时旧 License 立即替换，并封禁对应的 Supabase Auth 用户；新的 License 登录后恢复账号。已签发的短期访问令牌可能在到期前仍可用。
-- 管理员将 License 通过安全渠道交给对应手机号的使用者。用户登录时必须同时输入手机号和 License；服务端同时匹配手机号与 License 哈希，不提供仅凭 License 反查或登录的方式，也不收短信验证码或用户邮箱。
-- 数据库只保存 License 的 SHA-256 哈希。明文只在签发成功时返回并展示一次，管理员应立即复制给用户。
-- 服务端使用手机号哈希映射到内部 Supabase Auth 用户，创建认证会话后，浏览器继续使用 Supabase RLS 访问自己的记录。
-- Supabase Auth 需启用 Email/Password provider 供服务端建立内部 Auth 账号使用；用户流程不收集邮箱、不发送邮件，也不要求用户输入邮箱。
-- 最多 10 个受邀手机号。管理入口需要 HTTPS，并使用至少 32 字符的随机管理员密钥。请不要把管理员密钥放在 `NEXT_PUBLIC_` 环境变量中。
-
-## 配置与启动
-
-1. 在 Supabase 创建项目。
-2. 将 `.env.example` 复制为 `.env.local`，设置：
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`（只供服务端使用）
-   - `LICENSE_ADMIN_SECRET`（建议随机生成至少 32 字符）
-3. 在 Supabase SQL Editor 执行 [`supabase/schema.sql`](./supabase/schema.sql)。这会创建 License、饮食、体重表及私有图片存储策略。
-4. 安装并启动：
-
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-5. 打开 `/admin/licenses` 为每个受邀手机号签发 License，再把 License 交给对方。iPhone 端打开站点后输入手机号和对应 License 登录。
-
-## 访问控制与数据
-
-- License 签发和验证都在服务端执行，License 明文不入库。
-- `user_licenses` 无客户端访问策略；RLS 将餐食、体重和私有 Storage 图片限制为当前用户自己的数据。
-- 重新签发同一手机号的 License 会使旧 License 失效；撤销可在 Supabase SQL Editor 中将该号码的状态更新为 `revoked`，并封禁对应 auth user。
-- `SUPABASE_SERVICE_ROLE_KEY` 绝不能带 `NEXT_PUBLIC_` 前缀或传入浏览器。
-
-## AI 识图
-
-识图封装为服务端 provider（`src/lib/vision/`），前端只调用 `/api/analyze`，不绑定任何厂商，API key 只在服务端。
-
-| `VISION_PROVIDER` | 默认模型 | 说明 |
-| --- | --- | --- |
-| `deepseek`（默认） | `deepseek-flash` | 2026-09 起主模型原生支持图片输入，价格最低 |
-| `qwen` | `qwen-vl-max-latest` | 阿里百炼 OpenAI 兼容接口，中文菜品识别可作备选 |
-| 其他任意名称 | — | 需同时设置 `VISION_BASE_URL` 和 `VISION_MODEL`，任何 OpenAI 兼容视觉接口都可用 |
-
-环境变量：`VISION_API_KEY`（旧的 `DEEPSEEK_API_KEY` 仍兼容），可选 `VISION_BASE_URL`、`VISION_MODEL` 覆盖预置值。
-
-**为什么没用百度菜品识别：** 它面向单菜品图，只返回菜名和每 100g 卡路里，没有蛋白质/碳水/脂肪，也不估算份量；混合使用时三大营养素仍需要大模型补充。目前直接用视觉大模型一次性给出整份估算，后续若要接入，在 `src/lib/vision/` 新增 provider 即可。
-
-**流程：**
-1. 浏览器先把照片（含 iPhone HEIC）缩到最长边 1600px 并转成 JPEG（`src/lib/image.ts`），既避开 Vercel 4.5MB 请求体限制，也绕过预编译 sharp 不能解 HEIC 的问题。
-2. `/api/analyze` 校验 Supabase 登录和 License 有效性，未授权时不会把图片发给模型。
-3. 模型返回整份餐食的热量、三大营养素、分项明细（菜名/份量/热量）、把握程度和估算说明；服务端校验字段后回传。
-4. 表单回填并标记“AI 估算”，分项明细自动写入备注，用户保存前可修改任何数值。
-
-照片营养估算是近似值，尤其是份量、酱料和烹饪用油。API 故障不影响手动录入。
-
-## 食物库
-
-估算顺序：手机本地（7 天有效）→ 服务端 `food_library`（每 100 克营养，所有用户共享）→ AI。AI 文字估算和识图得到的新食物会自动入库，已有的不覆盖。
-
-- 每保存一条饮食记录，触发器按食物名称累加 `uses`；每满 N 次标记 `needs_refresh`。
-- 服务端每 30 分钟认领待更新的食物，让 AI 按"名称，100克"重估，新旧值各取一半。
-- N 在 `app_settings` 表里，默认 30。修改：`update public.app_settings set value = '50' where key = 'food_refresh_every';`（立即生效，不用重新部署）
-
-## 部署（server1 主 / server2 备）
-
-线上地址 `https://meal.example.com`。DNS 是 Cloudflare 代理的 CNAME → `www.example.com`，双机切换时随 www 一起切，不需要改 HA 脚本。
-
-- 请求链路：Cloudflare → 443 nginx stream（按 SNI 分到 real_web:9000）→ `conf.d/light-meal.conf` → `127.0.0.1:3100` 的 `light-meal.service`（lightmeal 用户，内存上限 320M）。
-- 证书：server1 用现有的 `*.example.com` 通配符证书；server2 用单独签发的 `/root/.acme.sh/meal.example.com_ecc/`，续期后自动 reload nginx。
-- 服务端配置在两台的 `/etc/light-meal.env`，由 `deploy.sh` 从本机 `.env.local` 同步（不含数据库密码）。
-- 应用无状态，数据都在 Supabase（东京，项目 `your-project-ref`），两台同时运行即可。
-
-日常发布：
-
-```bash
-deploy/deploy.sh            # 本机构建 standalone，推到 server1 和 server2，重启并检查
-deploy/deploy.sh server2       # 只发某一台
-```
-
-新服务器初始化：`deploy/setup-server.sh <host> <cert> <key>`（可重复执行，nginx -t 失败会自动回滚）。
-
-排查：`ssh root@server1 journalctl -u light-meal -f`。源站不要返回 502/504，Cloudflare 会把它们换成自己的非 JSON 错误页。
-
-## iPhone 安装
-
-在 iPhone Safari 打开 `https://meal.example.com`，点分享按钮并选择“添加到主屏幕”。Manifest 使用 standalone 展示模式，并提供 192/512 PNG 图标与 Apple touch icon。
+- 线上地址：<https://meal.example.com>
+- 技术栈：Next.js 15（App Router，standalone 输出）+ Supabase（Postgres / Auth / Storage）+ OpenAI 兼容的视觉/语言模型（默认 DeepSeek）
+- 部署：自建服务器 server1（主）/ server2（备），Cloudflare 代理
 
 ## 功能
 
-- **每日**：按天查看摄入汇总与饮食记录，可前后翻日期、为过去的日期补记；点记录可编辑或删除（照片会一并删除）。
-- **趋势**：近 7/30 天每日热量柱状图（含 2000 kcal 目标线）、记录天数、日均热量/蛋白质，以及体重变化曲线；点柱子跳到当天。
-- **体重**：每天一条，重复记录会覆盖当天数值。
-- 日期统一按设备本地时区计算。
+| 模块 | 说明 |
+| --- | --- |
+| 登录 | 手机号 + License，管理员在 `/admin/licenses` 签发，无短信、无邮箱 |
+| 记录一餐 | 照片可选，可多张；上传后自动识别，识别出几种食物就列几行（食物、重量、热量、✓）。改名称或重量后点 ✓ 重新计算；清空名称再点即删除。可补录过去的日期 |
+| 每日 | 当天摄入汇总（热量 / 蛋白质 / 碳水 / 脂肪），前后翻日期，点记录编辑，点照片看大图 |
+| 趋势 | 热量和体重折线图，7 / 30 / 90 天，点某一天查看或跳转 |
+| 体重 | 每天一条，可选日期补录 |
+| 设置 | 头像（可自行更换）、昵称、性别、生日（月日）、星座（由生日推算） |
+| 启动页 | iOS 启动图 + 应用内启动页，显示每日一句积极、健康的短句 |
+| 离线 | 页面、照片、食物数据本地缓存；保存先落本地，后台同步 |
 
-## 当前范围
+营养数据都是估算值，份量、酱料和用油误差最大，保存前可以修改。
 
-- 每日热量目标固定为 2000 kcal，暂未做个人设置。
-- 暂无离线缓存（Service Worker）；iOS 添加到主屏幕不依赖它。
+## 架构
+
+```
+iPhone（PWA）
+ ├─ Service Worker：页面缓存秒开、静态资源缓存
+ ├─ 本地：照片缓存（7 天）、食物库缓存（7 天）、每日一句（10 天）、待同步队列
+ ├─ Supabase（直连，RLS 只能读写自己的数据）：饮食、体重、资料、照片、头像
+ └─ meal.example.com（Cloudflare → nginx → Next.js）
+      ├─ /api/auth/license   手机号 + License 登录，换取 Supabase 会话
+      ├─ /api/admin/licenses 管理员签发 License
+      ├─ /api/analyze        识图（视觉模型，保留推理）
+      ├─ /api/estimate       按名称 + 重量估算（先查食物库，再问语言模型）
+      ├─ /api/quotes         未来 10 天的每日一句
+      └─ 后台任务            每 30 分钟按使用次数重估常用食物
+```
+
+服务端密钥（service role、模型 API key、管理员密钥）只在服务器上，浏览器拿不到。
+
+## 目录
+
+```
+src/app/                 页面和 API 路由（api/analyze、estimate、quotes、auth、admin）
+src/components/          home（主界面）、meal-modal（记录一餐）、trends、settings-modal、splash 等
+src/lib/vision/          模型 provider：OpenAI 兼容接口、返回结果解析
+src/lib/food-library.ts  服务端共享食物库读写
+src/lib/food-refresh.ts  食物库定时重估（由 src/instrumentation.ts 启动）
+src/lib/food-cache.ts    手机本地食物库
+src/lib/outbox.ts        饮食记录的待同步队列
+src/lib/photo-cache.ts   照片本地缓存
+public/sw.js             Service Worker
+supabase/schema.sql      数据库、存储桶、RLS、触发器（可重复执行）
+deploy/                  部署脚本、systemd 单元、nginx 配置
+```
+
+## 数据模型
+
+| 表 / 桶 | 用途 | 访问 |
+| --- | --- | --- |
+| `user_licenses` | 手机号、License 哈希、对应的 Auth 用户、状态 | 仅服务端 |
+| `user_profiles` | 昵称、性别、生日、头像路径 | 本人可读；只能改昵称/性别/生日/头像 |
+| `meal_records` | 一条饮食记录：日期、餐次、总营养、`dishes`（按照片分组的食物明细，每项含名称、克数、热量、三大营养素） | 本人 |
+| `weight_records` | 每天一条体重 | 本人 |
+| `food_library` | 共享食物库，每 100 克营养，含使用次数 `uses`、待更新标记 `needs_refresh` | 仅服务端 |
+| `app_settings` | 键值配置，如 `food_refresh_every` | 仅服务端 / SQL |
+| `meal-photos` 桶 | 饮食照片，按用户 ID 分目录 | 本人 |
+| `avatars` 桶 | 头像，按用户 ID 分目录 | 本人 |
+
+`schema.sql` 可以重复执行，用于新建和升级。
+
+## 登录与 License
+
+- 管理员在 `/admin/licenses` 输入手机号（11 位大陆号码或带国家码，统一存为 E.164）和管理员密钥，生成 License。明文只显示这一次，数据库只存 SHA-256 哈希。
+- 用户必须同时输入手机号和对应的 License。服务端把手机号映射到一个内部 Supabase Auth 用户，签发会话后，浏览器用 RLS 直接读写自己的数据。
+- 重新签发会让旧 License 立即失效，并封禁旧会话；新 License 登录后恢复。撤销：把 `user_licenses.status` 改成 `revoked`。
+- 最多 10 个手机号。Supabase 的公开注册已关闭；Email/Password provider 需保持开启，供服务端创建内部账号用。
+- 每次调用 AI 接口都会校验登录状态和 License 是否有效，未授权时不会把数据发给模型。
+
+## AI 识别与估算
+
+模型调用封装在 `src/lib/vision/`，前端不绑定任何厂商。
+
+| `VISION_PROVIDER` | 默认模型 | 说明 |
+| --- | --- | --- |
+| `deepseek`（默认） | `deepseek-flash` | 支持图片输入，价格最低 |
+| `qwen` | `qwen-vl-max-latest` | 阿里百炼 OpenAI 兼容接口 |
+| 其他名称 | — | 同时设置 `VISION_BASE_URL` 和 `VISION_MODEL`，任何 OpenAI 兼容接口都可以 |
+
+- **识图** `/api/analyze`：浏览器先把照片（含 HEIC）缩到最长边 1600px 的 JPEG。模型逐项返回食物名称、估计克数、热量和三大营养素；保留推理，超时 55 秒，通常 8–20 秒。
+- **按名称估算** `/api/estimate`：只调用语言模型、不发图片，并关闭推理（DeepSeek 的 `thinking: disabled`），通常 1–3 秒。
+- **只改重量**：直接在手机上按比例换算，不联网。
+- **查找顺序**：手机本地食物库 → 服务端 `food_library` → 模型。模型或识图得到的新食物会自动入库，已有的不覆盖，所以同一种食物前后数值一致。
+- **定期重估**：每保存一条记录，触发器给其中每种食物的 `uses` 加 1；每满 N 次标记待更新。服务端每 30 分钟认领一批，让模型按"名称，100克"重估，新旧值各取一半。N 默认 30，修改后立即生效：
+
+  ```sql
+  update public.app_settings set value = '50' where key = 'food_refresh_every';
+  ```
+
+- **每日一句**：`/api/quotes` 由模型生成积极、健康的短句（中文不超过 20 字，或英文不超过 10 个词），每台服务器每天生成一次；失败时用内置列表。
+
+没有选用百度菜品识别，因为它只给菜名和每 100 克热量，没有三大营养素，也不估份量。
+
+## 离线与同步
+
+- **启动**：iOS 启动图（`public/splash/`，覆盖常见 iPhone 尺寸）→ 应用内启动页（读取登录状态期间显示）。Service Worker 有缓存时直接用缓存打开页面，后台更新，所以**新版本在第二次打开时生效**。
+- **保存 / 删除**：照片先存进本地缓存，记录写入待同步队列（`localStorage`），弹窗立即关闭。后台依次上传照片、写数据库、删除被替换的旧照片。联网恢复、打开 App、或每分钟一次会自动重试。记录 ID 在客户端生成，写入都是 upsert，重试不会重复。提示区显示"正在同步 N 条记录"，完成后显示 3 秒"所有饮食记录已同步"。
+- **照片**：按存储路径缓存在 Cache Storage 中，保存 7 天；离线时过期的照片也照样显示。
+- **当天数据**：Supabase 连不上时，显示上次缓存的当天数据。
+
+## 本地开发
+
+1. 复制 `.env.example` 为 `.env.local`，填写：
+   - `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`（只在服务端用，不能加 `NEXT_PUBLIC_` 前缀）
+   - `LICENSE_ADMIN_SECRET`（至少 32 位随机字符）
+   - `VISION_PROVIDER`、`VISION_API_KEY`（可选 `VISION_BASE_URL`、`VISION_MODEL`）
+2. 执行 `supabase/schema.sql`（SQL Editor，或 `npx supabase db query --linked --project-ref <ref> -f supabase/schema.sql`）。
+3. 启动：
+
+   ```bash
+   npm install
+   npm run dev          # 开发
+   npm run build && npm start   # 本地跑生产版本（Service Worker 只在生产版本注册）
+   ```
+
+4. 测试用固定测试账号，手机号和 License 放在 `.env.test.local`（已被 git 忽略，也不会同步到服务器）。不要每次新建和删除测试用户。
+
+## 部署（server1 主 / server2 备）
+
+- DNS：`meal.example.com` 是走 Cloudflare 代理的 CNAME，指向 `www.example.com`，双机切换时跟着 www 一起切，不需要改 HA 脚本。
+- 链路：Cloudflare → 443 nginx stream（按 SNI 分到 `real_web:9000`）→ `conf.d/light-meal.conf` → `127.0.0.1:3100` 的 `light-meal.service`（`lightmeal` 用户，内存上限 320M）。两台同时运行，应用本身无状态。
+- 证书：server1 用 `*.example.com` 通配符证书；server2 用单独签发的 `/root/.acme.sh/meal.example.com_ecc/`，续期后自动 reload nginx。
+- 服务端配置：`/etc/light-meal.env`，部署时从本机 `.env.local` 同步，不包含数据库密码。
+
+```bash
+deploy/deploy.sh                 # 本机构建，推到 server1 和 server2，重启并检查健康状态（保留最近 3 个版本）
+deploy/deploy.sh server2            # 只发某一台
+deploy/setup-server.sh <host> <cert> <key>   # 新服务器初始化（可重复执行，nginx -t 失败自动回滚）
+```
+
+## 运维与排查
+
+```bash
+ssh root@server1 journalctl -u light-meal -f        # 应用日志（识图、估算、食物库重估都会打日志）
+ssh root@server1 systemctl restart light-meal
+curl -s --resolve meal.example.com:443:127.0.0.1 https://meal.example.com/   # 在服务器上绕过 Cloudflare 测源站
+```
+
+注意事项：
+
+- 源站不要返回 502/504，Cloudflare 会换成自己的非 JSON 错误页；接口出错统一用 503。
+- 推理模型的推理 token 也计入 `max_tokens`，上限太小会返回空内容。
+- 本机如果通过 Clash 等工具走 TUN 代理，`curl --resolve <IP>` 仍会被按域名转发到 Cloudflare；要测源站，请在服务器上执行。
+- iOS 的启动图要删除主屏幕图标后重新"添加到主屏幕"才会更新。
+
+## 已知限制
+
+- 每日热量目标固定为 2000 kcal。
+- 食物库还没有管理页面，修改数值需要直接改表。
+- 照片从 Supabase（东京）直接加载，首次查看和上传受网络影响；国内 CDN 需要备案，暂不考虑。
