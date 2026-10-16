@@ -10,6 +10,13 @@ import Trends from "./trends";
 
 const GOAL = 2000;
 
+function readCache(key: string): { meals: Meal[]; weights: WeightEntry[] } | null {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
+}
+function writeCache(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
 export default function Home() {
   const [supabase] = useState(createClient);
   const [session, setSession] = useState<any>(null);
@@ -41,7 +48,17 @@ export default function Home() {
     Promise.all([
       supabase.from("meal_records").select("*").gte("eaten_at", start).lt("eaten_at", end).order("eaten_at"),
       supabase.from("weight_records").select("*").lte("recorded_on", date).order("recorded_on", { ascending: false }).limit(7)
-    ]).then(([m, w]) => { setMeals((m.data || []) as Meal[]); setWeights((w.data || []) as WeightEntry[]); });
+    ]).then(([m, w]) => {
+      // 网络失败时用本机上次缓存的当天数据，避免 Supabase 连不上时页面变空。
+      const key = `light-meal:day:${session.user.id}:${date}`;
+      if (m.error || w.error) {
+        const cached = readCache(key);
+        if (cached) { setMeals(cached.meals); setWeights(cached.weights); setNotice("网络不稳定，显示的是上次加载的数据"); }
+        return;
+      }
+      setMeals((m.data || []) as Meal[]); setWeights((w.data || []) as WeightEntry[]);
+      writeCache(key, { meals: m.data, weights: w.data });
+    });
   }, [session, date, supabase, refreshKey]);
 
   // 私有 bucket 的照片用短期签名 URL 展示。
@@ -111,7 +128,7 @@ export default function Home() {
       </>}
       <footer>慢慢来，身体会记得你的用心。 <span>·</span> 仅你和受邀的人可见</footer>
     </div>
-    <nav className="tabbar"><button className={tab === "day" ? "active" : ""} onClick={() => setTab("day")}><Sun size={19}/>每日</button><button className="tab-add" aria-label="记录一餐" onClick={() => setEditing("new")}><Plus size={22}/></button><button className={tab === "trends" ? "active" : ""} onClick={() => setTab("trends")}><BarChart3 size={19}/>趋势</button></nav>
+    {!editing && <nav className="tabbar"><button className={tab === "day" ? "active" : ""} onClick={() => setTab("day")}><Sun size={19}/>每日</button><button className="tab-add" aria-label="记录一餐" onClick={() => setEditing("new")}><Plus size={22}/></button><button className={tab === "trends" ? "active" : ""} onClick={() => setTab("trends")}><BarChart3 size={19}/>趋势</button></nav>}
     {editing && <MealModal supabase={supabase} userId={session.user.id} date={tab === "day" ? date : todayISO()} initial={editing === "new" ? undefined : editing} initialImageUrl={editing !== "new" && editing.image_path ? photoUrls[editing.image_path] : undefined} onSaved={mealSaved} onDeleted={mealDeleted} onClose={() => setEditing(null)}/>}
   </main>;
 }

@@ -37,12 +37,12 @@ export default function Trends({ supabase, goal, refreshKey, onPickDay }: Props)
 
   const logged = [...byDay.values()].filter((d) => d.count > 0);
   const avg = (key: "calories" | "protein" | "carbs" | "fat") => logged.length ? Math.round(logged.reduce((s, d) => s + d[key], 0) / logged.length) : 0;
-  const max = Math.max(goal, ...[...byDay.values()].map((d) => d.calories));
+  const max = Math.max(goal * 1.2, ...[...byDay.values()].map((d) => d.calories));
 
   return <div className="trends">
     <section className="section"><div className="section-heading"><div><span className="eyebrow">CALORIE TREND</span><h2>热量趋势</h2></div><div className="segmented">{([7, 30] as const).map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} 天</button>)}</div></div>
       <div className={`calorie-chart ${range === 30 ? "dense" : ""}`} aria-busy={loading}>
-        <i className="goal-line" style={{ bottom: `${goal / max * 100}%` }}><span>目标 {goal}</span></i>
+        <i className="goal-line" style={{ bottom: `calc(20px + (100% - 20px) * ${goal / max})` }}><span>目标 {goal}</span></i>
         {days.map((d) => { const v = byDay.get(d)!; return <button key={d} title={`${shortDate(d)} ${Math.round(v.calories)} kcal`} onClick={() => onPickDay(d)}><i className={v.calories > goal ? "over" : ""} style={{ height: `${v.calories / max * 100}%` }}/><small>{range === 7 || d.endsWith("01") || d === days[0] ? shortDate(d) : ""}</small></button>; })}
       </div>
       <div className="trend-stats"><div><small>记录天数</small><strong>{logged.length}<span>/{range}</span></strong></div><div><small>日均热量</small><strong>{avg("calories")}<span>kcal</span></strong></div><div><small>日均蛋白质</small><strong>{avg("protein")}<span>g</span></strong></div></div>

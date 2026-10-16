@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import SwRegister from "@/components/sw-register";
 
 export const metadata: Metadata = {
   title: "轻食记 · 私人饮食记录",
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
   icons: { icon: "/icon.svg", apple: "/apple-touch-icon.png" }
 };
 
-export const viewport: Viewport = { themeColor: "#f7f8f4", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#f7f8f4", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body>{children}</body></html>;
+  return <html lang="zh-CN"><body>{children}<SwRegister/></body></html>;
 }
