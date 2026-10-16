@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Camera, ChevronLeft, ChevronRight, Leaf, Plus, Scale, Sun } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, migrateCookieSession } from "@/lib/supabase/client";
 import { addDays, dayRange, localDay, shortDate, shortWeekday, todayISO } from "@/lib/date";
 import type { Meal, WeightEntry } from "@/lib/types";
 import MealModal, { mealLabels } from "./meal-modal";
@@ -54,7 +54,7 @@ export default function Home() {
   const date = selectedDate;
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    migrateCookieSession(supabase).then(() => supabase.auth.getSession()).then(({ data }) => setSession(data.session ?? null));
     setQuote(todayQuote());
     refreshQuotes().then(() => setQuote(todayQuote()));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));

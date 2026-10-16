@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     const license_hash = createHash("sha256").update(license).digest("hex");
     const { data: previous } = await admin.from("user_licenses").select("user_id").eq("phone", phone).maybeSingle();
     if (previous?.user_id) {
-      const { error: revokeError } = await admin.auth.admin.updateUserById(previous.user_id, { ban_duration: "876000h" });
+      // 内部密码换成新 License：旧 License 立即无法登录，Supabase 同时注销该账号所有已有会话。
+      const { error: revokeError } = await admin.auth.admin.updateUserById(previous.user_id, { password: license, ban_duration: "none" });
       if (revokeError) throw revokeError;
     }
     const { error } = await admin.from("user_licenses").upsert({ phone, license_hash, status: "active", updated_at: new Date().toISOString() }, { onConflict: "phone" });

@@ -31,17 +31,21 @@ export async function POST(request: Request) {
       userId = data.user.id;
       const { error: linkError } = await admin.from("user_licenses").update({ user_id: userId, updated_at: new Date().toISOString() }).eq("id", entry.id);
       if (linkError) throw linkError;
-    } else {
-      const { error: updateError } = await admin.auth.admin.updateUserById(userId, { password: license, ban_duration: "none" });
-      if (updateError) throw updateError;
     }
 
     // 资料行按手机号关联到账号；已有的昵称等字段不受影响。
     const { error: profileError } = await admin.from("user_profiles").upsert({ phone: entry.phone, user_id: userId }, { onConflict: "phone" });
     if (profileError) throw profileError;
 
+    // 登录时不改密码：Supabase 改密码会注销该账号的所有其他会话（另一台设备会被踢下线）。
+    // 内部密码只在创建账号和重新签发 License 时设置；对不上时（旧版本遗留、曾被封禁）才同步一次。
     const auth = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    const { data, error: signInError } = await auth.auth.signInWithPassword({ email, password: license });
+    let { data, error: signInError } = await auth.auth.signInWithPassword({ email, password: license });
+    if (signInError || !data.session) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(userId, { password: license, ban_duration: "none" });
+      if (updateError) throw updateError;
+      ({ data, error: signInError } = await auth.auth.signInWithPassword({ email, password: license }));
+    }
     if (signInError || !data.session) throw signInError || new Error("Session was not created.");
     return NextResponse.json({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }, { headers: { "Cache-Control": "no-store" } });
   } catch {

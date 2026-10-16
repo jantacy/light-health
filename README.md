@@ -73,7 +73,9 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
 
 - 管理员在 `/admin/licenses` 输入手机号（11 位大陆号码或带国家码，统一存为 E.164）和管理员密钥，生成 License。明文只显示这一次，数据库只存 SHA-256 哈希。
 - 用户必须同时输入手机号和对应的 License。服务端把手机号映射到一个内部 Supabase Auth 用户，签发会话后，浏览器用 RLS 直接读写自己的数据。
-- 重新签发会让旧 License 立即失效，并封禁旧会话；新 License 登录后恢复。撤销：把 `user_licenses.status` 改成 `revoked`。
+- 内部 Auth 密码只在创建账号和重新签发 License 时设置，登录时不改：Supabase 修改密码会注销该账号的所有会话，所以同一账号可以同时在多台设备（或 Safari 与主屏幕 App）登录。
+- 重新签发会让旧 License 立即失效，并注销该账号已有的全部会话。撤销：把 `user_licenses.status` 改成 `revoked`。
+- 浏览器端会话存在 localStorage（Safari 会把脚本写的 cookie 限制为 7 天）；旧版本存在 cookie 里的会话，首次打开新版本时自动迁移。
 - 最多 10 个手机号。Supabase 的公开注册已关闭；Email/Password provider 需保持开启，供服务端创建内部账号用。
 - 每次调用 AI 接口都会校验登录状态和 License 是否有效，未授权时不会把数据发给模型。
 
