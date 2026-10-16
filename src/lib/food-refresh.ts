@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getVisionProvider } from "@/lib/vision";
 
 // 定时处理被标记 needs_refresh 的食物：让 AI 按“名称，100克”重估，新旧数值各取一半，避免单次估算偏差带来大幅跳动。
-// claim_food_refresh 用 skip locked 认领，server1 和 server2 同时运行也不会重复处理。
+// claim_food_refresh 用 skip locked 认领，多台服务器同时运行也不会重复处理。
 const INTERVAL = 30 * 60 * 1000;
 const r1 = (v: number) => Math.round(v * 10) / 10;
 

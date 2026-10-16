@@ -8,7 +8,7 @@ User=lightmeal
 Group=lightmeal
 WorkingDirectory=/opt/light-meal/current
 EnvironmentFile=/etc/light-meal.env
-Environment=NODE_ENV=production PORT=3100 HOSTNAME=127.0.0.1 NODE_OPTIONS=--max-old-space-size=192
+Environment=NODE_ENV=production PORT=__PORT__ HOSTNAME=127.0.0.1 NODE_OPTIONS=--max-old-space-size=192
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=3

@@ -2,9 +2,8 @@
 
 给 3–10 位受邀用户用的饮食和体重记录工具：拍照识别食物、AI 估算热量和三大营养素、按天汇总和看趋势。主要在 iPhone Safari 上使用，可以添加到主屏幕当 App 用。
 
-- 线上地址：<https://meal.example.com>
 - 技术栈：Next.js 15（App Router，standalone 输出）+ Supabase（Postgres / Auth / Storage）+ OpenAI 兼容的视觉/语言模型（默认 DeepSeek）
-- 部署：自建服务器 server1（主）/ server2（备），Cloudflare 代理
+- 部署：自建 Linux 服务器（nginx + systemd），可多台同时运行，前面可以套 Cloudflare 等 CDN
 
 ## 功能
 
@@ -28,7 +27,7 @@ iPhone（PWA）
  ├─ Service Worker：页面缓存秒开、静态资源缓存
  ├─ 本地：照片缓存（7 天）、食物库缓存（7 天）、每日一句（10 天）、待同步队列
  ├─ Supabase（直连，RLS 只能读写自己的数据）：饮食、体重、资料、照片、头像
- └─ meal.example.com（Cloudflare → nginx → Next.js）
+ └─ 你的域名（CDN → nginx → Next.js）
       ├─ /api/auth/license   手机号 + License 登录，换取 Supabase 会话
       ├─ /api/admin/licenses 管理员签发 License
       ├─ /api/analyze        识图（视觉模型，保留推理）
@@ -127,36 +126,45 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
 
 4. 测试用固定测试账号，手机号和 License 放在 `.env.test.local`（已被 git 忽略，也不会同步到服务器）。不要每次新建和删除测试用户。
 
-## 部署（server1 主 / server2 备）
+## 部署
 
-- DNS：`meal.example.com` 是走 Cloudflare 代理的 CNAME，指向 `www.example.com`，双机切换时跟着 www 一起切，不需要改 HA 脚本。
-- 链路：Cloudflare → 443 nginx stream（按 SNI 分到 `real_web:9000`）→ `conf.d/light-meal.conf` → `127.0.0.1:3100` 的 `light-meal.service`（`lightmeal` 用户，内存上限 320M）。两台同时运行，应用本身无状态。
-- 证书：server1 用 `*.example.com` 通配符证书；server2 用单独签发的 `/root/.acme.sh/meal.example.com_ecc/`，续期后自动 reload nginx。
-- 服务端配置：`/etc/light-meal.env`，部署时从本机 `.env.local` 同步，不包含数据库密码。
+在本机构建 standalone 包，用 rsync 推到一台或多台服务器，由 systemd 运行、nginx 反代。应用本身无状态（数据都在 Supabase），多台服务器可以同时运行，配合 DNS 切换做主备。
 
-```bash
-deploy/deploy.sh                 # 本机构建，推到 server1 和 server2，重启并检查健康状态（保留最近 3 个版本）
-deploy/deploy.sh server2            # 只发某一台
-deploy/setup-server.sh <host> <cert> <key>   # 新服务器初始化（可重复执行，nginx -t 失败自动回滚）
-```
+1. 复制 `deploy/deploy.env.example` 为 `deploy/deploy.env`（不进 git），填写服务器、域名、端口和 nginx 监听方式。
+2. 每台服务器初始化一次（可重复执行；`nginx -t` 失败会自动回滚）：
+
+   ```bash
+   deploy/setup-server.sh <host> <证书路径> <私钥路径>
+   ```
+
+   会创建 `lightmeal` 系统用户、`light-meal.service`（内存上限 320M）和 nginx 站点。如果 443 由 nginx stream 按 SNI 分流，设置 `NGINX_SNI_BACKEND` 后脚本会把域名加进 SNI map。
+
+3. 发布：
+
+   ```bash
+   deploy/deploy.sh          # 发布到 DEPLOY_HOSTS：构建、同步 /etc/light-meal.env（来自 .env.local，不含数据库密码）、重启、健康检查，保留最近 3 个版本
+   deploy/deploy.sh host2    # 只发某一台
+   ```
+
+服务器需要 Node.js 20+、nginx（1.25+，使用了 `http2 on`）、rsync，以及能用 root 登录的 SSH。
 
 ## 运维与排查
 
 ```bash
-ssh root@server1 journalctl -u light-meal -f        # 应用日志（识图、估算、食物库重估都会打日志）
-ssh root@server1 systemctl restart light-meal
-curl -s --resolve meal.example.com:443:127.0.0.1 https://meal.example.com/   # 在服务器上绕过 Cloudflare 测源站
+journalctl -u light-meal -f        # 应用日志（识图、估算、食物库重估都会打日志）
+systemctl restart light-meal
+curl -s --resolve <域名>:443:127.0.0.1 https://<域名>/   # 在服务器上绕过 CDN 测源站
 ```
 
 注意事项：
 
-- 源站不要返回 502/504，Cloudflare 会换成自己的非 JSON 错误页；接口出错统一用 503。
+- 如果前面套了 Cloudflare：源站不要返回 502/504，否则会被换成 Cloudflare 自己的非 JSON 错误页；接口出错统一用 503。
 - 推理模型的推理 token 也计入 `max_tokens`，上限太小会返回空内容。
-- 本机如果通过 Clash 等工具走 TUN 代理，`curl --resolve <IP>` 仍会被按域名转发到 Cloudflare；要测源站，请在服务器上执行。
+- 本机如果通过 Clash 等工具走 TUN 代理，`curl --resolve <IP>` 仍会按域名被转发到 CDN；要测源站，请在服务器上执行。
 - iOS 的启动图要删除主屏幕图标后重新"添加到主屏幕"才会更新。
 
 ## 已知限制
 
 - 每日热量目标固定为 2000 kcal。
 - 食物库还没有管理页面，修改数值需要直接改表。
-- 照片从 Supabase（东京）直接加载，首次查看和上传受网络影响；国内 CDN 需要备案，暂不考虑。
+- 照片从 Supabase Storage 直接加载，首次查看和上传受用户到 Supabase 区域的网络影响。

@@ -6,3 +6,5 @@ out/
 *.tsbuildinfo
 supabase/.temp/
 .gstack/
+deploy/deploy.env
+deploy/*.local.md
