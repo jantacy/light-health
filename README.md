@@ -59,9 +59,29 @@
 
 照片营养估算是近似值，尤其是份量、酱料和烹饪用油。API 故障不影响手动录入。
 
+## 部署（server1 主 / server2 备）
+
+线上地址 `https://meal.example.com`。DNS 是 Cloudflare 代理的 CNAME → `www.example.com`，双机切换时随 www 一起切，不需要改 HA 脚本。
+
+- 请求链路：Cloudflare → 443 nginx stream（按 SNI 分到 real_web:9000）→ `conf.d/light-meal.conf` → `127.0.0.1:3100` 的 `light-meal.service`（lightmeal 用户，内存上限 320M）。
+- 证书：server1 用现有的 `*.example.com` 通配符证书；server2 用单独签发的 `/root/.acme.sh/meal.example.com_ecc/`，续期后自动 reload nginx。
+- 服务端配置在两台的 `/etc/light-meal.env`，由 `deploy.sh` 从本机 `.env.local` 同步（不含数据库密码）。
+- 应用无状态，数据都在 Supabase（东京，项目 `your-project-ref`），两台同时运行即可。
+
+日常发布：
+
+```bash
+deploy/deploy.sh            # 本机构建 standalone，推到 server1 和 server2，重启并检查
+deploy/deploy.sh server2       # 只发某一台
+```
+
+新服务器初始化：`deploy/setup-server.sh <host> <cert> <key>`（可重复执行，nginx -t 失败会自动回滚）。
+
+排查：`ssh root@server1 journalctl -u light-meal -f`。源站不要返回 502/504，Cloudflare 会把它们换成自己的非 JSON 错误页。
+
 ## iPhone 安装
 
-生产环境请用 HTTPS 部署。在 iPhone Safari 打开站点，点分享按钮并选择“添加到主屏幕”。Manifest 使用 standalone 展示模式，并提供 192/512 PNG 图标与 Apple touch icon。
+在 iPhone Safari 打开 `https://meal.example.com`，点分享按钮并选择“添加到主屏幕”。Manifest 使用 standalone 展示模式，并提供 192/512 PNG 图标与 Apple touch icon。
 
 ## 功能
 
@@ -72,6 +92,5 @@
 
 ## 当前范围
 
-- 云端项目和真实密钥需要由使用者创建与配置。
 - 每日热量目标固定为 2000 kcal，暂未做个人设置。
 - 暂无离线缓存（Service Worker）；iOS 添加到主屏幕不依赖它。
