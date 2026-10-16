@@ -17,7 +17,7 @@ export type FoodAnalysis = {
 export interface VisionProvider {
   name: string;
   model: string;
-  analyze(jpeg: Buffer): Promise<FoodAnalysis>;
+  analyze(image: Buffer, mime: string): Promise<FoodAnalysis>;
 }
 
 export class VisionError extends Error {

@@ -13,7 +13,7 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
   return {
     name: opts.name,
     model: opts.model,
-    async analyze(jpeg) {
+    async analyze(image, mime) {
       const response = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
@@ -28,7 +28,7 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
               role: "user",
               content: [
                 { type: "text", text: "识别这张饮食照片，估算整份餐食的营养。" },
-                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${jpeg.toString("base64")}` } }
+                { type: "image_url", image_url: { url: `data:${mime};base64,${image.toString("base64")}` } }
               ]
             }
           ]

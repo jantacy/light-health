@@ -1,15 +1,19 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getVisionProvider, VisionError } from "@/lib/vision";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-// 前端会先把照片（含 iPhone HEIC）压缩成 JPEG；预编译的 sharp 不支持 HEIC 解码。
-const supportedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+// 前端已把照片（含 iPhone HEIC）缩到 1600px 并转成 JPEG，这里只按文件头确认确实是图片。
+function imageMime(b: Buffer) {
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return null;
+}
 
 export async function POST(request: Request) {
   const provider = getVisionProvider();
@@ -38,22 +42,13 @@ export async function POST(request: Request) {
   const form = await request.formData().catch(() => null);
   const image = form?.get("image");
   if (!(image instanceof File)) return NextResponse.json({ error: "请先选择一张照片。" }, { status: 400 });
-  if (!supportedTypes.has(image.type)) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
   if (image.size > 4 * 1024 * 1024) return NextResponse.json({ error: "图片不能超过 4 MB。" }, { status: 413 });
-
-  let jpeg: Buffer;
-  try {
-    jpeg = await sharp(Buffer.from(await image.arrayBuffer()), { animated: false, failOn: "error" })
-      .rotate()
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-  } catch {
-    return NextResponse.json({ error: "无法读取这张图片，请换一张试试。" }, { status: 415 });
-  }
+  const bytes = Buffer.from(await image.arrayBuffer());
+  const mime = imageMime(bytes);
+  if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
 
   try {
-    const analysis = await provider.analyze(jpeg);
+    const analysis = await provider.analyze(bytes, mime);
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message }, { status: err.status });

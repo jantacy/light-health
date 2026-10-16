@@ -1,0 +1,22 @@
+[Unit]
+Description=轻食记 (light-meal) Next.js server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=lightmeal
+Group=lightmeal
+WorkingDirectory=/opt/light-meal/current
+EnvironmentFile=/etc/light-meal.env
+Environment=NODE_ENV=production PORT=3100 HOSTNAME=127.0.0.1 NODE_OPTIONS=--max-old-space-size=192
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+MemoryMax=320M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
