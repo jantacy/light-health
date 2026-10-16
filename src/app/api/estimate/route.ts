@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireLicense } from "@/lib/require-license";
 import { getVisionProvider, VisionError } from "@/lib/vision";
+import { fromPer100, lookupFoods, normName, saveFoods } from "@/lib/food-library";
 
 export const runtime = "nodejs";
 
-// 按食物名称 + 重量估算营养：只调用语言模型（不发图片、关闭推理），通常 1~3 秒。
+// 按食物名称 + 重量估算营养：先查共享食物库，查不到才调用语言模型（不发图片、关闭推理），结果入库。
 export async function POST(request: Request) {
   const provider = getVisionProvider();
   if (!provider) return NextResponse.json({ error: "AI 估算尚未配置。" }, { status: 503 });
@@ -16,12 +17,17 @@ export async function POST(request: Request) {
   const grams = Number(body?.grams) > 0 ? Math.min(Math.round(Number(body.grams)), 5000) : 0;
   if (!name) return NextResponse.json({ error: "请填写食物名称。" }, { status: 400 });
 
+  if (grams) {
+    const row = (await lookupFoods([name])).get(normName(name));
+    if (row) return NextResponse.json({ ...fromPer100(row, grams), grams, source: "library" }, { headers: { "Cache-Control": "no-store" } });
+  }
+
   try {
     const a = await provider.analyze({ hint: grams ? `${name}，${grams}克` : name });
-    return NextResponse.json(
-      { calories: a.calories, protein_g: a.protein_g, carbs_g: a.carbs_g, fat_g: a.fat_g, grams: grams || a.items[0]?.grams || 0 },
-      { headers: { "Cache-Control": "no-store" } }
-    );
+    const resultGrams = grams || a.items[0]?.grams || 0;
+    const n = { calories: a.calories, protein_g: a.protein_g, carbs_g: a.carbs_g, fat_g: a.fat_g };
+    await saveFoods([{ name, grams: resultGrams, n }], "ai");
+    return NextResponse.json({ ...n, grams: resultGrams, source: "ai" }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message.replace("识图", "AI 估算") }, { status: err.status });
     console.error("[estimate]", err);

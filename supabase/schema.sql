@@ -104,3 +104,19 @@ drop policy if exists "Users upload own avatar" on storage.objects;
 create policy "Users upload own avatar" on storage.objects for insert to authenticated with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists "Users delete own avatar" on storage.objects;
 create policy "Users delete own avatar" on storage.objects for delete to authenticated using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 共享食物库：每 100 克的营养。AI 估算或识图得到的结果写入这里，之后同名食物直接查库，不再调用 AI。
+-- 只允许服务端（service role）访问。
+create table if not exists public.food_library (
+  name text primary key,              -- 归一化后的名称（去空格、小写）
+  display_name text not null,
+  calories_100g numeric(7,1) not null check (calories_100g >= 0),
+  protein_100g numeric(6,1) not null default 0 check (protein_100g >= 0),
+  carbs_100g numeric(6,1) not null default 0 check (carbs_100g >= 0),
+  fat_100g numeric(6,1) not null default 0 check (fat_100g >= 0),
+  source text not null default 'ai' check (source in ('ai', 'photo', 'manual')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.food_library enable row level security;
+-- No client policies: server-only.

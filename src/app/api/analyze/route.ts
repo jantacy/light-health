@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
 import { requireLicense } from "@/lib/require-license";
 import { getVisionProvider, VisionError } from "@/lib/vision";
+import { fromPer100, lookupFoods, normName, saveFoods } from "@/lib/food-library";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,6 +31,20 @@ export async function POST(request: Request) {
 
   try {
     const analysis = await provider.analyze({ image: bytes, mime });
+    // 库里已有的食物按库里的单位营养重算（同一种食物前后一致）；新的食物入库。
+    const library = await lookupFoods(analysis.items.map((i) => i.name));
+    const fresh: Parameters<typeof saveFoods>[0] = [];
+    analysis.items = analysis.items.map((i) => {
+      const row = library.get(normName(i.name));
+      if (row && i.grams > 0) return { ...i, ...fromPer100(row, i.grams) };
+      fresh.push({ name: i.name, grams: i.grams, n: i });
+      return i;
+    });
+    if (analysis.items.length) {
+      const t = analysis.items.reduce((a, i) => ({ calories: a.calories + i.calories, protein_g: a.protein_g + i.protein_g, carbs_g: a.carbs_g + i.carbs_g, fat_g: a.fat_g + i.fat_g }), { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
+      Object.assign(analysis, t);
+    }
+    await saveFoods(fresh, "photo");
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message }, { status: err.status });
