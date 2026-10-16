@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Camera, LoaderCircle, PenLine, Sparkles, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { compressImage } from "@/lib/image";
+import { rememberPhoto } from "@/lib/photo-cache";
 import { todayISO } from "@/lib/date";
 import type { Dish, Meal } from "@/lib/types";
 import type { FoodAnalysis, FoodItem } from "@/lib/vision/types";
@@ -130,6 +131,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
           image_path = `${userId}/${crypto.randomUUID()}.jpg`;
           const { error } = await supabase.storage.from("meal-photos").upload(image_path, d.photo, { upsert: false, contentType: "image/jpeg" });
           if (error) throw error;
+          rememberPhoto("meal-photos", image_path, d.photo);
           update(d.key, { image_path });
         }
         saved.push({ name: d.name.trim(), calories: num(d.calories), protein_g: num(d.protein_g), carbs_g: num(d.carbs_g), fat_g: num(d.fat_g), image_path });

@@ -91,3 +91,16 @@ drop policy if exists "Users edit own profile" on public.user_profiles;
 create policy "Users edit own profile" on public.user_profiles for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 revoke insert, update, delete on public.user_profiles from anon, authenticated;
 grant update (nickname, gender, birth_month, birth_day, updated_at) on public.user_profiles to authenticated;
+
+-- 头像：私有 bucket，每个用户只能读写自己目录下的文件；路径存在 user_profiles.avatar_path。
+alter table public.user_profiles add column if not exists avatar_path text;
+grant update (avatar_path) on public.user_profiles to authenticated;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', false, 2097152, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public = false, file_size_limit = 2097152, allowed_mime_types = array['image/jpeg','image/png','image/webp'];
+drop policy if exists "Users read own avatar" on storage.objects;
+create policy "Users read own avatar" on storage.objects for select to authenticated using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "Users upload own avatar" on storage.objects;
+create policy "Users upload own avatar" on storage.objects for insert to authenticated with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "Users delete own avatar" on storage.objects;
+create policy "Users delete own avatar" on storage.objects for delete to authenticated using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);

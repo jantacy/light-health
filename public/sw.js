@@ -1,5 +1,5 @@
 // 离线缓存：CDN/源站不稳定时仍能打开应用。接口（/api/）和 Supabase 请求不缓存。
-const CACHE = "light-meal-v2";
+const CACHE = "light-meal-v3"; // 只清理 light-meal-v* 旧版本，不碰照片缓存 light-meal-photos
 const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -8,7 +8,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("light-meal-v") && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
 

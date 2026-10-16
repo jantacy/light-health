@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Camera, ChevronLeft, ChevronRight, Flame, Leaf, Plus, Scale, Settings, Sun } from "lucide-react";
+import { BarChart3, Camera, ChevronLeft, ChevronRight, Flame, Leaf, Plus, Scale, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { addDays, dayRange, localDay, shortDate, shortWeekday, todayISO } from "@/lib/date";
 import type { Meal, WeightEntry } from "@/lib/types";
@@ -9,7 +9,9 @@ import MealModal, { mealLabels } from "./meal-modal";
 import Trends from "./trends";
 import DateField from "./date-field";
 import PhotoViewer from "./photo-viewer";
-import SettingsModal from "./settings-modal";
+import SettingsModal, { type Profile } from "./settings-modal";
+import Avatar from "./avatar";
+import { photoUrl, prunePhotos } from "@/lib/photo-cache";
 import Splash, { refreshQuotes } from "./splash";
 
 const GOAL = 2000;
@@ -39,6 +41,8 @@ export default function Home() {
   const [weightDate, setWeightDate] = useState(todayISO);
   const [viewing, setViewing] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const requestedPhotos = useRef(new Set<string>());
   const date = selectedDate;
@@ -69,17 +73,27 @@ export default function Home() {
     });
   }, [session, date, supabase, refreshKey]);
 
+  // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
+  async function loadProfile(retry = true) {
+    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path").maybeSingle();
+    const p = data as Profile | null;
+    if (!p) { if (retry) setTimeout(() => loadProfile(false), 1000); return; }
+    setProfile(p);
+    if (p.avatar_path) photoUrl(supabase, "avatars", p.avatar_path).then((url) => setAvatarUrl(url ?? ""));
+  }
+  useEffect(() => { if (session) loadProfile(); }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 体重默认记在正在查看的那天，也可以改日期补录。
   useEffect(() => setWeightDate(selectedDate), [selectedDate]);
 
-  // 私有 bucket 的照片用短期签名 URL 展示。
+  useEffect(() => { prunePhotos(); }, []);
+
+  // 照片优先从本地缓存读取，没有再从私有 bucket 下载。
   useEffect(() => {
     const paths = [...new Set(meals.flatMap((m) => [m.image_path, ...(m.dishes ?? []).map((d) => d.image_path)]))].filter((p): p is string => !!p && !requestedPhotos.current.has(p));
     if (!paths.length) return;
     paths.forEach((p) => requestedPhotos.current.add(p));
-    supabase.storage.from("meal-photos").createSignedUrls(paths, 3600).then(({ data }) => {
-      if (data) setPhotoUrls((urls) => ({ ...urls, ...Object.fromEntries(data.filter((d) => d.signedUrl && d.path).map((d) => [d.path!, d.signedUrl as string])) }));
-    });
+    for (const path of paths) photoUrl(supabase, "meal-photos", path).then((url) => { if (url) setPhotoUrls((urls) => ({ ...urls, [path]: url })); });
   }, [meals, supabase]);
 
   const totals = useMemo(() => meals.reduce((a, m) => ({ calories: a.calories + Number(m.calories), protein: a.protein + Number(m.protein_g), carbs: a.carbs + Number(m.carbs_g), fat: a.fat + Number(m.fat_g) }), { calories: 0, protein: 0, carbs: 0, fat: 0 }), [meals]);
@@ -128,11 +142,11 @@ export default function Home() {
   if (!session) return <main className="auth-screen"><div className="auth-card"><div className="brand-mark"><Leaf size={24}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>好好吃饭，<br/>慢慢记录。</h1><p className="auth-copy">输入受邀手机号和对应的专属 License，打开你的私人饮食记录空间。</p><form onSubmit={signInWithLicense} className="auth-form"><label htmlFor="login-phone">手机号</label><input id="login-phone" type="tel" autoComplete="tel" required placeholder="13800000000" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)}/><label htmlFor="license">License</label><input id="license" type="password" autoComplete="current-password" required placeholder="输入你收到的 License" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)}/><button className="primary-button" type="submit" disabled={loggingIn}>{loggingIn ? "正在验证…" : "登录"} <ChevronRight size={18}/></button></form>{authMessage && <p className="form-message">{authMessage}</p>}<p className="tiny-note">手机号与 License 必须匹配</p></div><div className="auth-decoration"><span>01</span><i/><span>照顾身体，从一餐开始</span></div></main>;
 
   return <main className="app-shell">
-    <header className="topbar"><a className="wordmark" href="#top"><span className="brand-mark small"><Leaf size={17}/></span>轻食记</a><button className="settings-button" onClick={() => setShowSettings(true)}><Settings size={17}/>设置</button></header>
+    <header className="topbar"><a className="wordmark" href="#top"><span className="brand-mark small"><Leaf size={17}/></span>轻食记</a><button className="avatar-button" aria-label="设置" onClick={() => { if (!profile) loadProfile(false); setShowSettings(true); }}><Avatar src={avatarUrl} name={profile?.nickname}/></button></header>
     <div className="dashboard" id="top">
       {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {tab === "trends" ? <Trends supabase={supabase} goal={GOAL} refreshKey={refreshKey} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>
-      <section className="welcome"><div><span className="eyebrow">{greetingDate}</span><h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1><p>记录每一餐，照顾好自己的节奏。</p></div><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></section>
+      <section className="welcome"><div><span className="eyebrow">{greetingDate}</span>{profile?.nickname && <p className="greeting">你好，{profile.nickname}！</p>}<h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1><p>记录每一餐，照顾好自己的节奏。</p></div><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></section>
       <section className="summary-card"><div className="summary-head"><div><span className="eyebrow light">{isToday ? "TODAY’S INTAKE" : "DAILY INTAKE"}</span><h2>{isToday ? "今日摄入" : `${shortDate(date)} 摄入`}</h2></div><span className="flame-icon"><Flame size={19}/></span></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div></section>
       <section className="section meal-section"><div className="section-heading"><div><span className="eyebrow">YOUR DAY</span><h2>饮食记录 <span className="count">{meals.length}</span></h2></div><button className="text-button" onClick={() => setEditing("new")}><Plus size={17}/> 添加一餐</button></div>
         <div className="meal-list">{meals.length ? meals.map((item) => <div className="meal-row" role="button" tabIndex={0} key={item.id} onClick={() => setEditing(item)}>{item.image_path && photoUrls[item.image_path] ? <button className="meal-thumb" aria-label="查看照片" onClick={(e) => { e.stopPropagation(); setViewing(photoUrls[item.image_path!]); }}><img src={photoUrls[item.image_path]} alt=""/></button> : <div className="meal-thumb"><Leaf size={18}/></div>}<div className="meal-info"><span>{mealLabels[item.meal_type]} <small>{new Date(item.eaten_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}{item.dishes?.length > 1 && ` · ${item.dishes.length} 道菜`}</small></span><strong>{item.title}</strong></div><div className="meal-calories"><strong>{Math.round(Number(item.calories))}</strong><small>kcal</small></div></div>) : <div className="empty-meals"><div className="empty-icon"><Camera size={20}/></div><strong>还没有饮食记录</strong><span>{isToday ? "从今天的第一餐开始吧" : "可以为这一天补记"}</span><button onClick={() => setEditing("new")}>记录一餐 <ChevronRight size={15}/></button></div>}</div>
@@ -143,7 +157,7 @@ export default function Home() {
     </div>
     {!editing && !showSettings && <nav className="tabbar"><button className={tab === "day" ? "active" : ""} onClick={() => setTab("day")}><Sun size={19}/>每日</button><button className="tab-add" aria-label="记录一餐" onClick={() => setEditing("new")}><Plus size={22}/></button><button className={tab === "trends" ? "active" : ""} onClick={() => setTab("trends")}><BarChart3 size={19}/>趋势</button></nav>}
     {editing && <MealModal supabase={supabase} userId={session.user.id} date={tab === "day" ? date : todayISO()} initial={editing === "new" ? undefined : editing} photoUrls={photoUrls} onSaved={mealSaved} onDeleted={mealDeleted} onClose={() => setEditing(null)}/>}
-    {showSettings && <SettingsModal supabase={supabase} onClose={() => setShowSettings(false)} onSaved={() => { setShowSettings(false); setNotice("资料已保存"); }}/>}
+    {showSettings && <SettingsModal supabase={supabase} userId={session.user.id} initial={profile} avatarUrl={avatarUrl} onClose={() => setShowSettings(false)} onSaved={(p) => { setProfile(p); setShowSettings(false); setNotice("资料已保存"); }} onAvatarChanged={(p, url) => { setProfile(p); setAvatarUrl(url); }}/>}
     {viewing && <PhotoViewer src={viewing} onClose={() => setViewing("")}/>}
   </main>;
 }
