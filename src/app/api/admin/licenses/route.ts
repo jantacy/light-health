@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
 
@@ -14,8 +15,8 @@ function authorized(request: Request) {
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "管理密钥不正确。" }, { status: 401 });
   const body = await request.json().catch(() => null);
-  const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
-  if (!/^\+[1-9][0-9]{7,14}$/.test(phone)) return NextResponse.json({ error: "请输入 E.164 格式手机号，例如 +8613800000000。" }, { status: 400 });
+  const phone = normalizePhone(body?.phone);
+  if (!phone) return NextResponse.json({ error: "手机号格式不正确，例如 13800000000 或 +8613800000000。" }, { status: 400 });
 
   try {
     const admin = createAdminClient();

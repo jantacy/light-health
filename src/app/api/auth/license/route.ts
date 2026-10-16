@@ -2,14 +2,15 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizePhone } from "@/lib/phone";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const phone = typeof body?.phone === "string" ? body.phone.trim() : "";
+  const phone = normalizePhone(body?.phone);
   const license = typeof body?.license === "string" ? body.license.trim() : "";
-  if (!/^\+[1-9][0-9]{7,14}$/.test(phone) || !/^FOOD-[A-Za-z0-9_-]{32}$/.test(license)) return NextResponse.json({ error: "手机号或 License 无效。" }, { status: 401 });
+  if (!phone || !/^FOOD-[A-Za-z0-9_-]{32}$/.test(license)) return NextResponse.json({ error: "手机号或 License 无效。" }, { status: 401 });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) return NextResponse.json({ error: "登录服务尚未配置。" }, { status: 503 });

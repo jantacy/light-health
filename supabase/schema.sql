@@ -4,13 +4,16 @@ create extension if not exists pgcrypto with schema extensions;
 
 create table if not exists public.user_licenses (
   id uuid primary key default gen_random_uuid(),
-  phone text not null unique check (phone ~ '^\\+[1-9][0-9]{7,14}$'),
+  phone text not null unique check (phone ~ '^\+[1-9][0-9]{7,14}$'),
   license_hash text not null unique,
   user_id uuid unique references auth.users(id) on delete set null,
   status text not null default 'active' check (status in ('active', 'revoked')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- 早期版本的 check 写成了 '^\\+...'，会拒绝所有 +86 号码；重复执行本文件即可修正。
+alter table public.user_licenses drop constraint if exists user_licenses_phone_check;
+alter table public.user_licenses add constraint user_licenses_phone_check check (phone ~ '^\+[1-9][0-9]{7,14}$');
 alter table public.user_licenses enable row level security;
 -- No client policies: phone/license mappings are server-only.
 

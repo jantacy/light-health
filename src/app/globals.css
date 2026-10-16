@@ -2,3 +2,49 @@
 @media(min-width:700px){.app-shell{padding-bottom:70px}.welcome{padding-top:57px}.summary-card{padding:30px 34px 27px}.meal-modal{align-self:center;border-radius:23px}.modal-backdrop{align-items:center}}@media(max-width:500px){.app-shell{padding:0 18px 38px}.topbar{height:64px}.welcome{padding:37px 1px 24px;align-items:flex-start}.welcome h1{font-size:27px}.welcome p{font-size:11px}.date-pill{font-size:10px;padding:7px 9px;margin-top:5px}.summary-card{padding:23px 22px 21px;border-radius:19px}.calorie-line strong{font-size:41px}.macro-grid{gap:9px}.section{margin-top:29px}.section-heading h2{font-size:17px}.auth-card,.setup-card{padding:30px 25px}.auth-card h1{font-size:34px}.user-menu span{max-width:115px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meal-modal{padding:20px 18px 23px}.nutrition-fields{gap:0 8px}}
 .resend-button{border:0;background:transparent;color:#6e846f;font-size:11px;padding:6px}
 .license-result{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin-top:12px;border:1px solid #dfe8db;border-radius:12px;background:#f1f5ee}.license-result code{font-size:12px;word-break:break-all;color:#345640}.license-result button{white-space:nowrap;display:flex;align-items:center;gap:5px;border:0;border-radius:8px;background:#e1eadf;color:#456c4d;padding:8px 10px;font-size:11px;font-weight:600}.admin-card h1{font-family:'DM Sans','Noto Sans SC',sans-serif;font-size:30px}
+
+/* 编辑/删除、识图结果、趋势页、底部标签栏 */
+.notice{margin:16px 0 0}
+.app-shell{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+.meal-row{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;color:inherit}
+.meal-info{flex:1;min-width:0}
+.meal-info strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meal-thumb{flex:none;overflow:hidden}
+.meal-thumb img{width:100%;height:100%;object-fit:cover}
+.field-label textarea{width:100%;border:1px solid #e6ebe3;background:#fff;border-radius:11px;padding:11px 12px;color:#34473b;outline:none;font:inherit;font-size:13px;resize:vertical}
+.field-label textarea:focus{border-color:#8da88d;box-shadow:0 0 0 3px #8da88d1b}
+.analysis-card{margin:12px 0 4px;padding:12px 14px;border-radius:13px;background:#f3f6f0;border:1px solid #e3eadf;font-size:12px;color:#4d6152}
+.analysis-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.analysis-head small{color:#869488}
+.ai-badge{font-size:10px;font-weight:700;letter-spacing:.06em;color:#fff;background:var(--green);border-radius:6px;padding:3px 7px}
+.analysis-card ul{list-style:none;margin:0;padding:0}
+.analysis-card li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed #dde5d9}
+.analysis-card li small{color:#869488}
+.analysis-card li b{font-weight:600;white-space:nowrap}
+.analysis-card p{margin:8px 0 0;line-height:1.5}
+.analysis-card .analysis-disclaimer{color:#9aa69c;font-size:11px}
+.delete-button{width:100%;margin-top:10px;border:0;background:transparent;color:#b0655d;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px}
+.tabbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:28px;padding:8px 26px;border-radius:24px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 30px rgba(38,58,50,.12);z-index:20}
+.tabbar button{border:0;background:transparent;color:#9aa69c;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 6px}
+.tabbar button.active{color:var(--green);font-weight:600}
+.tabbar .tab-add{width:46px;height:46px;border-radius:16px;background:var(--green);color:#fff;justify-content:center}
+.trends{padding-top:20px}
+.segmented{display:flex;background:#edf1ea;border-radius:10px;padding:3px}
+.segmented button{border:0;background:transparent;font-size:12px;color:#748377;padding:5px 11px;border-radius:8px}
+.segmented button.active{background:#fff;color:var(--green);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.calorie-chart{position:relative;height:170px;display:flex;align-items:flex-end;gap:6px;padding-bottom:20px;margin-top:8px}
+.calorie-chart.dense{gap:2px}
+.calorie-chart>button{flex:1;height:100%;border:0;background:transparent;padding:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;min-width:0}
+.calorie-chart>button i{display:block;width:100%;max-width:28px;min-height:2px;border-radius:6px 6px 2px 2px;background:#9db89c}
+.calorie-chart>button i.over{background:#d39a83}
+.calorie-chart>button small{position:absolute;bottom:-18px;font-size:9px;color:#9aa69c;white-space:nowrap}
+.calorie-chart .goal-line{position:absolute;left:0;right:0;border-top:1px dashed #c6cfc3;margin-bottom:20px;pointer-events:none}
+.calorie-chart .goal-line span{position:absolute;right:0;top:-15px;font-size:9px;color:#9aa69c;font-style:normal}
+.trend-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}
+.trend-stats div{background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 12px}
+.trend-stats small{display:block;font-size:10px;color:#869488}
+.trend-stats strong{font-size:18px;color:#334a3c;font-weight:600}
+.trend-stats strong span{font-size:10px;color:#849087;font-weight:400;margin-left:2px}
+.weight-chart svg{width:100%;height:130px;display:block}
+.weight-chart polyline{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.weight-axis{display:flex;justify-content:space-between;font-size:10px;color:#869488;margin-top:6px}

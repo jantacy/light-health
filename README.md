@@ -4,7 +4,7 @@
 
 ## License 规则
 
-- 管理员打开 `/admin/licenses`，输入手机号和 `LICENSE_ADMIN_SECRET`，由服务端生成 License。
+- 管理员打开 `/admin/licenses`，输入手机号（11 位大陆号码或 +国家码，服务端统一为 E.164）和 `LICENSE_ADMIN_SECRET`，由服务端生成 License。
 - 每个手机号至多对应一条有效 License。重新签发时旧 License 立即替换，并封禁对应的 Supabase Auth 用户；新的 License 登录后恢复账号。已签发的短期访问令牌可能在到期前仍可用。
 - 管理员将 License 通过安全渠道交给对应手机号的使用者。用户登录时必须同时输入手机号和 License；服务端同时匹配手机号与 License 哈希，不提供仅凭 License 反查或登录的方式，也不收短信验证码或用户邮箱。
 - 数据库只保存 License 的 SHA-256 哈希。明文只在签发成功时返回并展示一次，管理员应立即复制给用户。
@@ -39,32 +39,39 @@
 
 ## AI 识图
 
-已接入 DeepSeek `deepseek-flash`。在服务端设置 `DEEPSEEK_API_KEY` 后，识图会调用 DeepSeek OpenAI 兼容的 Chat Completions API，要求模型返回 JSON，并校验菜名、热量和三大营养素字段。API 会验证当前 Supabase 登录状态和手机号对应 License 是否有效；未登录或授权失效时不发送图片给模型。
+识图封装为服务端 provider（`src/lib/vision/`），前端只调用 `/api/analyze`，不绑定任何厂商，API key 只在服务端。
 
-识图支持 JPG、PNG、WebP、GIF 和 iPhone HEIC/HEIF。服务端使用 Sharp 自动旋转、缩到最长边 2048 像素并转为 JPEG，再发送给模型。单张图片最大 10 MB。`src/app/api/analyze/route.ts` 中的结果会回填到表单，用户保存前可以修正所有估算值。
+| `VISION_PROVIDER` | 默认模型 | 说明 |
+| --- | --- | --- |
+| `deepseek`（默认） | `deepseek-flash` | 2026-09 起主模型原生支持图片输入，价格最低 |
+| `qwen` | `qwen-vl-max-latest` | 阿里百炼 OpenAI 兼容接口，中文菜品识别可作备选 |
+| 其他任意名称 | — | 需同时设置 `VISION_BASE_URL` 和 `VISION_MODEL`，任何 OpenAI 兼容视觉接口都可用 |
 
-照片营养估算是近似值，尤其是份量、酱料和烹饪用油；请把结果作为记录起点，按实际情况修改。API 故障不会阻止手动录入。
+环境变量：`VISION_API_KEY`（旧的 `DEEPSEEK_API_KEY` 仍兼容），可选 `VISION_BASE_URL`、`VISION_MODEL` 覆盖预置值。
 
-预期 JSON 格式：
+**为什么没用百度菜品识别：** 它面向单菜品图，只返回菜名和每 100g 卡路里，没有蛋白质/碳水/脂肪，也不估算份量；混合使用时三大营养素仍需要大模型补充。目前直接用视觉大模型一次性给出整份估算，后续若要接入，在 `src/lib/vision/` 新增 provider 即可。
 
-```json
-{
-  "title": "鸡胸肉藜麦沙拉",
-  "calories": 420,
-  "protein_g": 32,
-  "carbs_g": 38,
-  "fat_g": 14
-}
-```
+**流程：**
+1. 浏览器先把照片（含 iPhone HEIC）缩到最长边 1600px 并转成 JPEG（`src/lib/image.ts`），既避开 Vercel 4.5MB 请求体限制，也绕过预编译 sharp 不能解 HEIC 的问题。
+2. `/api/analyze` 校验 Supabase 登录和 License 有效性，未授权时不会把图片发给模型。
+3. 模型返回整份餐食的热量、三大营养素、分项明细（菜名/份量/热量）、把握程度和估算说明；服务端校验字段后回传。
+4. 表单回填并标记“AI 估算”，分项明细自动写入备注，用户保存前可修改任何数值。
 
-要换成其他视觉模型，可在同一路由替换 provider 请求格式，并保留账号授权检查和返回数据校验。
+照片营养估算是近似值，尤其是份量、酱料和烹饪用油。API 故障不影响手动录入。
 
 ## iPhone 安装
 
 生产环境请用 HTTPS 部署。在 iPhone Safari 打开站点，点分享按钮并选择“添加到主屏幕”。Manifest 使用 standalone 展示模式，并提供 192/512 PNG 图标与 Apple touch icon。
 
+## 功能
+
+- **每日**：按天查看摄入汇总与饮食记录，可前后翻日期、为过去的日期补记；点记录可编辑或删除（照片会一并删除）。
+- **趋势**：近 7/30 天每日热量柱状图（含 2000 kcal 目标线）、记录天数、日均热量/蛋白质，以及体重变化曲线；点柱子跳到当天。
+- **体重**：每天一条，重复记录会覆盖当天数值。
+- 日期统一按设备本地时区计算。
+
 ## 当前范围
 
 - 云端项目和真实密钥需要由使用者创建与配置。
-- DeepSeek API key 需要在部署环境配置后才能调用视觉识别。
-- 体重趋势使用最近记录的轻量可视化；编辑、删除、导出可在后续补充。
+- 每日热量目标固定为 2000 kcal，暂未做个人设置。
+- 暂无离线缓存（Service Worker）；iOS 添加到主屏幕不依赖它。
