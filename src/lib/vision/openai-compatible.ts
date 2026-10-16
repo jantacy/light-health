@@ -1,9 +1,10 @@
 import { parseAnalysis } from "./parse";
-import { VisionError, type VisionProvider } from "./types";
+import { VisionError, type AnalyzeInput, type VisionProvider } from "./types";
 
-const systemPrompt = `你是饮食记录助手。只根据照片估算可见食物的一人份营养，不给医疗建议。
+const systemPrompt = `你是饮食记录助手。根据照片和/或用户给出的菜名估算一人份营养，不给医疗建议。
 - 按中国家常菜/外卖常见做法估算份量和烹饪用油；看不清的成分不要假装精确。
-- 照片里没有食物时，title 填"未识别到食物"，各数值填 0，confidence 填 low。
+- 用户给出菜名时，以用户的菜名为准（照片识别可能有误），照片只用来判断份量；用户写了份量就按用户的份量。
+- 照片里没有食物且没有菜名时，title 填"未识别到食物"，各数值填 0，confidence 填 low。
 只返回一个 JSON 对象，不要输出其他文字，字段：
 title（简短中文菜名，多道菜用顿号连接）、calories（总热量 kcal）、protein_g、carbs_g、fat_g（克）、
 items（数组，每项 {name, portion（如"约200g"、"1碗"）, calories}）、confidence（high/medium/low）、notes（一句话说明估算依据或不确定点）。
@@ -13,7 +14,12 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
   return {
     name: opts.name,
     model: opts.model,
-    async analyze(image, mime) {
+    async analyze({ image, mime, hint }: AnalyzeInput) {
+      const text = image
+        ? hint ? `用户确认这道菜是「${hint}」，以这个菜名为准，结合照片判断份量并估算营养。` : "识别这张饮食照片，估算整份餐食的营养。"
+        : `没有照片。按「${hint}」的常见一人份估算营养，title 用这个菜名。`;
+      const userContent: unknown[] = [{ type: "text", text }];
+      if (image) userContent.push({ type: "image_url", image_url: { url: `data:${mime};base64,${image.toString("base64")}` } });
       const response = await fetch(`${opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
@@ -24,13 +30,7 @@ export function createOpenAICompatibleProvider(opts: { name: string; baseUrl: st
           max_tokens: 800,
           messages: [
             { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "识别这张饮食照片，估算整份餐食的营养。" },
-                { type: "image_url", image_url: { url: `data:${mime};base64,${image.toString("base64")}` } }
-              ]
-            }
+            { role: "user", content: userContent }
           ]
         })
       });

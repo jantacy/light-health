@@ -41,14 +41,21 @@ export async function POST(request: Request) {
 
   const form = await request.formData().catch(() => null);
   const image = form?.get("image");
-  if (!(image instanceof File)) return NextResponse.json({ error: "请先选择一张照片。" }, { status: 400 });
-  if (image.size > 4 * 1024 * 1024) return NextResponse.json({ error: "图片不能超过 4 MB。" }, { status: 413 });
-  const bytes = Buffer.from(await image.arrayBuffer());
-  const mime = imageMime(bytes);
-  if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
+  const rawHint = form?.get("hint");
+  const hint = typeof rawHint === "string" ? rawHint.trim().slice(0, 100) : "";
+  let bytes: Buffer | undefined;
+  let mime: string | undefined;
+  if (image instanceof File) {
+    if (image.size > 4 * 1024 * 1024) return NextResponse.json({ error: "图片不能超过 4 MB。" }, { status: 413 });
+    bytes = Buffer.from(await image.arrayBuffer());
+    mime = imageMime(bytes) ?? undefined;
+    if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
+  } else if (!hint) {
+    return NextResponse.json({ error: "请上传照片或填写菜名。" }, { status: 400 });
+  }
 
   try {
-    const analysis = await provider.analyze(bytes, mime);
+    const analysis = await provider.analyze({ image: bytes, mime, hint: hint || undefined });
     return NextResponse.json(analysis, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     if (err instanceof VisionError) return NextResponse.json({ error: err.message }, { status: err.status });

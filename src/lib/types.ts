@@ -1,3 +1,5 @@
+export type Dish = { name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; image_path: string | null };
+
 export type Meal = {
   id: string;
   eaten_at: string;
@@ -9,6 +11,7 @@ export type Meal = {
   carbs_g: number;
   fat_g: number;
   notes: string | null;
+  dishes: Dish[];
 };
 
 export type WeightEntry = { id: string; recorded_on: string; weight_kg: number };

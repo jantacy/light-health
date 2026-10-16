@@ -14,3 +14,7 @@ export function addDays(date: string, delta: number) {
 }
 
 export const shortDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
+
+// 例如 "10月16日 周五"
+export const weekdayDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" }).replace(/(日)(周)/, "$1 $2");
+export const shortWeekday = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString("zh-CN", { weekday: "short" });

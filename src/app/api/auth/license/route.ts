@@ -36,6 +36,10 @@ export async function POST(request: Request) {
       if (updateError) throw updateError;
     }
 
+    // 资料行按手机号关联到账号；已有的昵称等字段不受影响。
+    const { error: profileError } = await admin.from("user_profiles").upsert({ phone: entry.phone, user_id: userId }, { onConflict: "phone" });
+    if (profileError) throw profileError;
+
     const auth = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
     const { data, error: signInError } = await auth.auth.signInWithPassword({ email, password: license });
     if (signInError || !data.session) throw signInError || new Error("Session was not created.");

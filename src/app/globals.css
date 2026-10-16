@@ -64,3 +64,79 @@
 @media(max-width:500px){.welcome{flex-direction:column;align-items:flex-start;gap:16px}.date-pill{margin-top:0}}
 .calorie-chart{margin-top:22px}
 .calorie-chart .goal-line{margin-bottom:0}
+/* 固定页面宽度：禁止横向溢出和 iOS 自动放大文字 */
+html,body{max-width:100%;overflow-x:clip;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.meal-info strong,.analysis-card li span{overflow-wrap:anywhere}
+
+/* 顶栏固定 + 设置入口 */
+.topbar{position:sticky;top:0;z-index:15;margin:0 -24px;padding:env(safe-area-inset-top) 24px 0;height:calc(64px + env(safe-area-inset-top));max-width:none;background:rgba(247,248,244,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+@media(max-width:500px){.topbar{margin:0 -18px;padding-left:18px;padding-right:18px}}
+@media(min-width:700px){.topbar{padding-left:max(24px,calc((100vw - 990px)/2));padding-right:max(24px,calc((100vw - 990px)/2))}}
+.settings-button{border:1px solid #e2e9df;background:#fff;border-radius:99px;padding:7px 13px;display:flex;align-items:center;gap:6px;color:#5f7064;font-size:13px}
+.gender-switch{align-self:flex-start}
+.gender-switch button{padding:7px 22px;font-size:14px}
+.field-label input:disabled{color:#7d8a80;background:#f1f4ef;-webkit-text-fill-color:#7d8a80;opacity:1}
+
+/* 日期选择：显示带星期的文字，点击触发系统日期选择 */
+.date-field{position:relative;display:flex;align-items:center;gap:8px;border:1px solid #e6ebe3;background:#fff;border-radius:11px;padding:11px 12px;color:#34473b;font-size:14px;font-weight:500;white-space:nowrap}
+.date-field small{color:#869488;font-weight:400}
+.date-field input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.form-row .field-label{min-width:0}
+.weight-section .field-label{margin:0 0 10px}
+
+/* 菜品列表 */
+.dish-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.dish{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px}
+.dish-top{display:flex;align-items:center;gap:10px}
+.dish-thumb{flex:none;width:52px;height:52px;border-radius:11px;border:0;padding:0;overflow:hidden;background:#e8eee6;color:#729074;display:grid;place-items:center}
+.dish-thumb img{width:100%;height:100%;object-fit:cover}
+.dish-thumb:disabled{cursor:default}
+.dish-name{flex:1;min-width:0;border:1px solid #e6ebe3;border-radius:10px;padding:9px 10px;font-size:14px;color:#34473b;background:#fbfcfa;outline:none}
+.dish-name:focus{border-color:#8da88d}
+.dish-remove{flex:none;border:0;background:transparent;color:#a0aaa2;padding:6px}
+.dish-status{display:flex;align-items:center;gap:6px;margin:8px 0 0;font-size:12px;color:#6c896c}
+.dish-status.error{color:#b0655d}
+.dish-estimate{margin-top:8px;border:0;background:#eaf1e7;color:var(--green);border-radius:9px;padding:7px 11px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.dish-items{margin:8px 0 0;font-size:11px;color:#869488;line-height:1.5}
+.dish-nums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+.dish-nums label{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dish-nums small{font-size:10px;color:#869488}
+.dish-nums input{width:100%;min-width:0;border:1px solid #e6ebe3;border-radius:9px;padding:7px 6px;font-size:14px;color:#34473b;background:#fbfcfa;outline:none}
+.dish-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.dish-actions button{border:1px dashed #b9cab7;background:#f0f4ee;color:#4c6b52;border-radius:12px;padding:12px 8px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
+.meal-modal>form>.analysis-disclaimer{margin:8px 2px 0;font-size:11px;color:#9aa69c}
+.meal-total{margin-top:14px;padding:12px 14px;border-radius:13px;background:var(--green);color:#e8f0e6;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:12px}
+.meal-total strong{font-size:22px;color:#fff;font-weight:600}
+.meal-total strong small{font-size:11px;font-weight:400;color:#d4e2d2}
+
+/* 记录行：点缩略图看大图，点其他地方编辑 */
+.meal-row{cursor:pointer}
+button.meal-thumb{border:0;padding:0}
+.photo-viewer{position:fixed;inset:0;z-index:50;background:rgba(10,16,12,.92);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.photo-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.photo-viewer-close{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:99px;width:40px;height:40px;display:grid;place-items:center}
+
+/* 折线图 */
+.range-switch{width:max-content;margin:4px auto 0}
+.range-switch button{padding:6px 16px;font-size:13px}
+.line-chart{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px 10px}
+.line-chart-info{display:flex;align-items:center;gap:10px;min-height:28px;font-size:12px;color:#869488}
+.line-chart-info strong{color:#334a3c;font-size:15px}
+.line-chart-info button{margin-left:auto;border:0;background:#eaf1e7;color:var(--green);border-radius:8px;padding:5px 9px;font-size:12px;display:flex;align-items:center;gap:2px}
+.line-chart-plot{position:relative;height:150px;margin:10px 4px 0}
+.line-chart-plot svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.line-chart-plot path{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.line-chart-plot .dot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff;border:2px solid var(--green);pointer-events:none}
+.line-chart-plot .dot.over{border-color:#d39a83}
+.line-chart-plot .dot.active{width:12px;height:12px;margin:-6px 0 0 -6px;background:var(--green)}
+.line-chart-plot .cursor{position:absolute;top:0;bottom:0;width:1px;background:#c6cfc3;pointer-events:none}
+.line-chart-plot .goal-line{position:absolute;left:0;right:0;border-top:1px dashed #c6cfc3;pointer-events:none}
+.line-chart-plot .goal-line span{position:absolute;right:0;top:-15px;font-size:9px;color:#9aa69c;font-style:normal}
+.hit-areas{position:absolute;inset:0;display:flex}
+.hit-areas button{flex:1;border:0;background:transparent;padding:0;min-width:0}
+.line-chart-axis{position:relative;height:18px;margin:6px 4px 0}
+.line-chart-axis span{position:absolute;transform:translateX(-50%);font-size:10px;color:#9aa69c;white-space:nowrap}
+.line-chart-axis span:first-child{transform:none}
+.line-chart-axis span:last-child{transform:translateX(-100%)}
+.date-field svg{flex:none;width:16px;height:16px}

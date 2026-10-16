@@ -31,6 +31,8 @@ create table if not exists public.meal_records (
   notes text,
   created_at timestamptz not null default now()
 );
+-- 每餐的菜品明细：[{name, calories, protein_g, carbs_g, fat_g, image_path}]，餐的总营养是它们的和。
+alter table public.meal_records add column if not exists dishes jsonb not null default '[]'::jsonb;
 create index if not exists meal_records_user_eaten_idx on public.meal_records (user_id, eaten_at desc);
 alter table public.meal_records enable row level security;
 drop policy if exists "Users read own meals" on public.meal_records;
@@ -71,3 +73,21 @@ drop policy if exists "Users upload own meal photos" on storage.objects;
 create policy "Users upload own meal photos" on storage.objects for insert to authenticated with check (bucket_id = 'meal-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 drop policy if exists "Users delete own meal photos" on storage.objects;
 create policy "Users delete own meal photos" on storage.objects for delete to authenticated using (bucket_id = 'meal-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 用户资料。手机号和 user_id 由服务端在登录时写入；用户只能改昵称、性别、生日（星座由生日推算，不入库）。
+create table if not exists public.user_profiles (
+  phone text primary key check (phone ~ '^\+[1-9][0-9]{7,14}$'),
+  user_id uuid unique references auth.users(id) on delete set null,
+  nickname text check (char_length(nickname) <= 30),
+  gender text check (gender in ('male', 'female')),
+  birth_month smallint check (birth_month between 1 and 12),
+  birth_day smallint check (birth_day between 1 and 31),
+  updated_at timestamptz not null default now()
+);
+alter table public.user_profiles enable row level security;
+drop policy if exists "Users read own profile" on public.user_profiles;
+create policy "Users read own profile" on public.user_profiles for select to authenticated using (auth.uid() = user_id);
+drop policy if exists "Users edit own profile" on public.user_profiles;
+create policy "Users edit own profile" on public.user_profiles for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+revoke insert, update, delete on public.user_profiles from anon, authenticated;
+grant update (nickname, gender, birth_month, birth_day, updated_at) on public.user_profiles to authenticated;

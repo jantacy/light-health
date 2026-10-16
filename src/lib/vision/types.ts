@@ -14,10 +14,13 @@ export type FoodAnalysis = {
   model: string;
 };
 
+export type AnalyzeInput = { image?: Buffer; mime?: string; hint?: string };
+
 export interface VisionProvider {
   name: string;
   model: string;
-  analyze(image: Buffer, mime: string): Promise<FoodAnalysis>;
+  // image 和 hint 至少有一个：只有照片=识图；照片+hint=以用户纠正的菜名为准；只有 hint=按名称估算。
+  analyze(input: AnalyzeInput): Promise<FoodAnalysis>;
 }
 
 export class VisionError extends Error {
