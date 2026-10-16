@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <!-- 没有照片时的默认示意图：一碗健康沙拉 -->
+  <rect width="120" height="120" fill="#eef3ea"/>
+  <ellipse cx="60" cy="66" rx="44" ry="40" fill="#fff"/>
+  <ellipse cx="60" cy="66" rx="36" ry="32" fill="#f4f7f1"/>
+  <g fill="#7fb069">
+    <path d="M34 62c4-14 18-18 26-12-8 2-16 8-18 18z"/>
+    <path d="M48 46c10-8 24-4 28 6-10-4-20-3-28 2z"/>
+    <path d="M72 50c12 0 18 10 16 20-4-8-10-12-18-12z" fill="#6a9e58"/>
+    <path d="M40 76c2-10 12-14 20-10-8 2-14 6-16 14z" fill="#8cc075"/>
+  </g>
+  <circle cx="52" cy="62" r="9" fill="#e4572e"/>
+  <path d="M52 55v14M45 62h14" stroke="#f4a88f" stroke-width="1.6"/>
+  <circle cx="74" cy="76" r="7" fill="#e86a45"/>
+  <ellipse cx="70" cy="60" rx="10" ry="8" fill="#fff" stroke="#e8eadf"/>
+  <circle cx="70" cy="60" r="4.5" fill="#f2b632"/>
+  <path d="M56 82c6-6 14-6 18 0-6 4-12 4-18 0z" fill="#b5cf6b"/>
+  <circle cx="65" cy="82" r="2.6" fill="#8a6a3a"/>
+</svg>
