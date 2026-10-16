@@ -16,6 +16,8 @@ REL=$(date +%Y%m%d%H%M%S)
 
 for h in "${HOSTS[@]}"; do
   echo "==> $h"
+  # 服务端配置：.env.local 去掉只在本机用的数据库密码
+  grep -v '^SUPABASE_DB_PASSWORD=' .env.local | ssh "root@$h" "cat > /etc/light-meal.env.new && install -m 640 -o root -g lightmeal /etc/light-meal.env.new /etc/light-meal.env && rm /etc/light-meal.env.new"
   ssh "root@$h" "mkdir -p /opt/light-meal/releases/$REL"
   rsync -az --delete "$PKG/" "root@$h:/opt/light-meal/releases/$REL/"
   ssh "root@$h" "set -e
