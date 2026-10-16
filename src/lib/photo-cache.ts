@@ -15,6 +15,12 @@ export async function rememberPhoto(bucket: string, path: string, blob: Blob) {
   } catch {}
 }
 
+// 后台同步用：取出本地缓存的照片文件（不管是否过期）。
+export async function cachedPhoto(bucket: string, path: string): Promise<Blob | null> {
+  if (!hasCache()) return null;
+  try { const hit = await (await caches.open(CACHE)).match(keyOf(bucket, path)); return hit ? await hit.blob() : null; } catch { return null; }
+}
+
 export async function photoUrl(supabase: SupabaseClient, bucket: string, path: string): Promise<string | null> {
   let stale: Response | undefined;
   if (hasCache()) {
@@ -29,11 +35,14 @@ export async function photoUrl(supabase: SupabaseClient, bucket: string, path: s
   return stale ? URL.createObjectURL(await stale.blob()) : null;
 }
 
-export async function prunePhotos() {
+// keep：还没上传完的照片路径，清理时跳过。
+export async function prunePhotos(keep: string[] = []) {
   if (!hasCache()) return;
+  const skip = new Set(keep.map((p) => keyOf("meal-photos", p)));
   try {
     const cache = await caches.open(CACHE);
     for (const request of await cache.keys()) {
+      if (skip.has(new URL(request.url).pathname)) continue;
       const hit = await cache.match(request);
       if (!hit || Date.now() - Number(hit.headers.get("X-Cached-At")) > TTL) await cache.delete(request);
     }

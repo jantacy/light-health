@@ -8,6 +8,7 @@ import { rememberPhoto } from "@/lib/photo-cache";
 import { lookupFood, rememberFood, scale } from "@/lib/food-cache";
 import { todayISO } from "@/lib/date";
 import type { Dish, DishItem, Meal } from "@/lib/types";
+import type { MealRow } from "@/lib/outbox";
 import type { FoodAnalysis, FoodItem } from "@/lib/vision/types";
 import DateField from "./date-field";
 import PhotoViewer from "./photo-viewer";
@@ -80,8 +81,8 @@ type Props = {
   date: string;
   initial?: Meal;
   photoUrls: Record<string, string>;
-  onSaved: (meal: Meal) => void;
-  onDeleted: (id: string) => void;
+  onSaved: (row: MealRow, upload: string[], remove: string[]) => void;
+  onDeleted: (id: string, remove: string[]) => void;
   onClose: () => void;
 };
 
@@ -167,53 +168,40 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
     const named = items.filter((i) => i.name.trim());
     if (!named.length) { setMessage("请先拍照识别，或手动添加食物。"); return; }
     if (items.some((i) => i.state === "dirty" || i.state === "error")) { setMessage("还有修改没有确认，请点每行后面的 ✓。"); return; }
+    // 先存本地、立刻关闭弹窗；照片上传和写数据库交给后台同步队列。
     setBusy("save"); setMessage("");
-    try {
-      const pathOf = new Map<string, string | null>();
-      for (const p of photos) {
-        let image_path = p.image_path;
-        if (p.photo && !image_path) {
-          image_path = `${userId}/${crypto.randomUUID()}.jpg`;
-          const { error } = await supabase.storage.from("meal-photos").upload(image_path, p.photo, { upsert: false, contentType: "image/jpeg" });
-          if (error) throw error;
-          rememberPhoto("meal-photos", image_path, p.photo);
-          updatePhoto(p.key, { image_path });
-        }
-        pathOf.set(p.key, image_path);
+    const pathOf = new Map<string, string | null>();
+    const upload: string[] = [];
+    for (const p of photos) {
+      let image_path = p.image_path;
+      if (p.photo && !image_path) {
+        image_path = `${userId}/${crypto.randomUUID()}.jpg`;
+        await rememberPhoto("meal-photos", image_path, p.photo); // 后台上传时从这里取
+        upload.push(image_path);
       }
-      // 按照片分组存成 dishes；手动添加的食物归到一组无照片的 dish。
-      const groups = [...photos.map((p) => p.key), null].map((photoKey) => ({ photoKey, list: named.filter((i) => i.photoKey === photoKey || (photoKey === null && !pathOf.has(i.photoKey ?? ""))) }));
-      const dishes: Dish[] = groups.filter((g) => g.list.length || (g.photoKey && pathOf.get(g.photoKey))).map(({ photoKey, list }) => {
-        const dishItems: DishItem[] = list.map((i) => ({ name: i.name.trim(), grams: Number(i.grams) || null, calories: round1(i.calories), protein_g: round1(i.protein_g), carbs_g: round1(i.carbs_g), fat_g: round1(i.fat_g) }));
-        const t = sum(dishItems);
-        return { name: dishItems.map((i) => i.name).join("、"), image_path: photoKey ? pathOf.get(photoKey) ?? null : null, items: dishItems, calories: round1(t.calories), protein_g: round1(t.protein_g), carbs_g: round1(t.carbs_g), fat_g: round1(t.fat_g) };
-      });
-      const fields = {
-        meal_type: mealType, title: autoTitle, notes: notes.trim() || null,
-        dishes, image_path: dishes.find((d) => d.image_path)?.image_path ?? null,
-        calories: Math.round(totals.calories), protein_g: round1(totals.protein_g), carbs_g: round1(totals.carbs_g), fat_g: round1(totals.fat_g),
-        eaten_at: eatenAtFor(date, initial?.eaten_at)
-      };
-      const query = initial
-        ? supabase.from("meal_records").update(fields).eq("id", initial.id)
-        : supabase.from("meal_records").insert({ ...fields, user_id: userId });
-      const { data, error } = await query.select().single();
-      if (error) throw error;
-      const kept = new Set(dishes.map((d) => d.image_path));
-      const removed = storedPaths(initial).filter((p) => !kept.has(p));
-      if (removed.length) await supabase.storage.from("meal-photos").remove(removed);
-      onSaved(data as Meal);
-    } catch (err) { setMessage(err instanceof Error ? err.message : "保存失败，请稍后重试"); setBusy(""); }
+      pathOf.set(p.key, image_path);
+    }
+    // 按照片分组存成 dishes；手动添加的食物归到一组无照片的 dish。
+    const groups = [...photos.map((p) => p.key), null].map((photoKey) => ({ photoKey, list: named.filter((i) => i.photoKey === photoKey || (photoKey === null && !pathOf.has(i.photoKey ?? ""))) }));
+    const dishes: Dish[] = groups.filter((g) => g.list.length || (g.photoKey && pathOf.get(g.photoKey))).map(({ photoKey, list }) => {
+      const dishItems: DishItem[] = list.map((i) => ({ name: i.name.trim(), grams: Number(i.grams) || null, calories: round1(i.calories), protein_g: round1(i.protein_g), carbs_g: round1(i.carbs_g), fat_g: round1(i.fat_g) }));
+      const t = sum(dishItems);
+      return { name: dishItems.map((i) => i.name).join("、"), image_path: photoKey ? pathOf.get(photoKey) ?? null : null, items: dishItems, calories: round1(t.calories), protein_g: round1(t.protein_g), carbs_g: round1(t.carbs_g), fat_g: round1(t.fat_g) };
+    });
+    const row: MealRow = {
+      id: initial?.id ?? crypto.randomUUID(), user_id: userId,
+      meal_type: mealType, title: autoTitle, notes: notes.trim() || null,
+      dishes, image_path: dishes.find((d) => d.image_path)?.image_path ?? null,
+      calories: Math.round(totals.calories), protein_g: round1(totals.protein_g), carbs_g: round1(totals.carbs_g), fat_g: round1(totals.fat_g),
+      eaten_at: eatenAtFor(date, initial?.eaten_at)
+    };
+    const kept = new Set(dishes.map((d) => d.image_path));
+    onSaved(row, upload, storedPaths(initial).filter((p) => !kept.has(p)));
   }
 
-  async function remove() {
+  function remove() {
     if (!initial || !confirm("确定删除这条饮食记录吗？")) return;
-    setBusy("delete");
-    const { error } = await supabase.from("meal_records").delete().eq("id", initial.id);
-    if (error) { setMessage("删除失败，请稍后重试。"); setBusy(""); return; }
-    const paths = storedPaths(initial);
-    if (paths.length) await supabase.storage.from("meal-photos").remove(paths);
-    onDeleted(initial.id);
+    onDeleted(initial.id, storedPaths(initial));
   }
 
   return <div className="modal-backdrop" onClick={onClose}><section className="meal-modal compact" role="dialog" aria-modal="true" aria-label={initial ? "编辑这一餐" : "记录一餐"} onClick={(e) => e.stopPropagation()}>

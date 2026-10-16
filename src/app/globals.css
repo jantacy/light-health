@@ -200,3 +200,5 @@ button.meal-thumb{border:0;padding:0}
 .meal-modal.compact{position:relative;padding-top:16px}
 .meal-modal .modal-close{position:absolute;top:8px;right:8px;z-index:2}
 .meal-modal.compact>form>.form-row:first-child{padding-right:36px;grid-template-columns:1.4fr 1fr}
+.sync-badge{margin-left:6px;font-style:normal;font-size:10px;color:#b8865a;background:#faf1e6;border-radius:6px;padding:1px 5px}
+.notice.syncing{background:#fbeceb;color:#c0392b;font-weight:600}
