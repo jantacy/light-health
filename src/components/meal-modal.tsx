@@ -91,8 +91,6 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
   const [mealType, setMealType] = useState<Meal["meal_type"]>(initial?.meal_type ?? guessMealType());
   const [photos, setPhotos] = useState<PhotoDraft[]>(initialDrafts.photos);
   const [items, setItems] = useState<ItemDraft[]>(initialDrafts.items);
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [titleTouched, setTitleTouched] = useState(!!initial);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [busy, setBusy] = useState<"" | "save" | "delete">("");
   const [message, setMessage] = useState("");
@@ -102,8 +100,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
   const updatePhoto = (key: string, patch: Partial<PhotoDraft>) => setPhotos((list) => list.map((p) => (p.key === key ? { ...p, ...patch } : p)));
   const updateItem = (key: string, patch: Partial<ItemDraft>) => setItems((list) => list.map((i) => (i.key === key ? { ...i, ...patch } : i)));
   const totals = sum(items);
-  const autoTitle = items.map((i) => i.name.trim()).filter(Boolean).join("、").slice(0, 160);
-  const shownTitle = titleTouched ? title : autoTitle;
+  const autoTitle = items.map((i) => i.name.trim()).filter(Boolean).join("、").slice(0, 160); // 餐食名称自动由食物名组成
   const analyzing = photos.filter((p) => p.status === "analyzing");
   const working = analyzing.length > 0 || items.some((i) => i.state === "computing");
 
@@ -192,7 +189,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
         return { name: dishItems.map((i) => i.name).join("、"), image_path: photoKey ? pathOf.get(photoKey) ?? null : null, items: dishItems, calories: round1(t.calories), protein_g: round1(t.protein_g), carbs_g: round1(t.carbs_g), fat_g: round1(t.fat_g) };
       });
       const fields = {
-        meal_type: mealType, title: (shownTitle.trim() || autoTitle).slice(0, 160), notes: notes.trim() || null,
+        meal_type: mealType, title: autoTitle, notes: notes.trim() || null,
         dishes, image_path: dishes.find((d) => d.image_path)?.image_path ?? null,
         calories: Math.round(totals.calories), protein_g: round1(totals.protein_g), carbs_g: round1(totals.carbs_g), fat_g: round1(totals.fat_g),
         eaten_at: eatenAtFor(date, initial?.eaten_at)
@@ -257,7 +254,6 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
 
       {items.length > 0 && <div className="meal-total"><span>合计</span><strong>{Math.round(totals.calories)}<small> kcal</small></strong><span>蛋白 {Math.round(totals.protein_g)}g · 碳水 {Math.round(totals.carbs_g)}g · 脂肪 {Math.round(totals.fat_g)}g</span></div>}
 
-      <label className="field-label">餐食名称<input maxLength={160} placeholder="默认用食物名称组合" value={shownTitle} onChange={(e) => { setTitleTouched(true); setTitle(e.target.value); }}/></label>
       <label className="field-label">备注<textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)}/></label>
       {message && <p className="form-message">{message}</p>}
       <button className="primary-button save-button" disabled={!!busy || working}>{busy === "save" ? "正在保存…" : working ? "等待 AI 计算完成…" : initial ? "保存修改" : "保存饮食记录"}</button>
