@@ -195,3 +195,8 @@ button.meal-thumb{border:0;padding:0}
 .food-error{grid-column:1/-1;margin:0;font-size:11px;color:#b0655d}
 .food-empty{margin:6px 2px 4px;font-size:12px;color:#9aa69c}
 .food-add{width:100%;margin-top:4px;border:0;border-top:1px dashed #e2e8df;background:transparent;color:var(--green);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;padding:10px 0 6px}
+
+/* 记录弹窗不显示标题：关闭按钮浮在右上角，日期/餐次行留出位置 */
+.meal-modal.compact{position:relative;padding-top:16px}
+.meal-modal .modal-close{position:absolute;top:8px;right:8px;z-index:2}
+.meal-modal.compact>form>.form-row:first-child{padding-right:36px;grid-template-columns:1.4fr 1fr}

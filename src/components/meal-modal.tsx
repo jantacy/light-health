@@ -219,8 +219,8 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
     onDeleted(initial.id);
   }
 
-  return <div className="modal-backdrop" onClick={onClose}><section className="meal-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" onClick={(e) => e.stopPropagation()}>
-    <div className="modal-head"><div><span className="eyebrow">{initial ? "EDIT ENTRY" : "NEW ENTRY"}</span><h2 id="modal-title">{initial ? "编辑这一餐" : "记录一餐"}</h2></div><button className="close-button" onClick={onClose} aria-label="关闭"><X size={20}/></button></div>
+  return <div className="modal-backdrop" onClick={onClose}><section className="meal-modal compact" role="dialog" aria-modal="true" aria-label={initial ? "编辑这一餐" : "记录一餐"} onClick={(e) => e.stopPropagation()}>
+    <button type="button" className="close-button modal-close" onClick={onClose} aria-label="关闭"><X size={20}/></button>
     <form onSubmit={save}>
       <div className="form-row">
         <DateField value={date} onChange={setDate}/>
