@@ -45,8 +45,6 @@ function shift(hex: string, hue: number, sat: number) {
 }
 
 const theme = (id: string | null | undefined) => THEMES.find((t) => t.id === id) ?? THEMES[0];
-// 某个主题下的颜色（6 位或 8 位 hex，不带 #）。生成图标、启动图的脚本也用它。
-export function themed(hex: string, id: string) { const t = theme(id); return t.id === DEFAULT_THEME ? `#${hex}` : shift(hex, t.hue, t.sat); }
 export const themeSwatch = (id: ThemeId) => { const t = theme(id); return shift("315f4d", t.hue, t.sat); };
 
 // 应用主题：写到根元素的 CSS 变量上；同时存一份到本机，layout 里的内联脚本在页面绘制前就套用，避免先闪一下默认色。
@@ -58,14 +56,7 @@ export function applyTheme(id: string | null | undefined) {
     else root.setProperty(`--c-${hex}`, (vars[`--c-${hex}`] = shift(hex, t.hue, t.sat)));
   }
   try { localStorage.setItem(THEME_VARS_KEY, JSON.stringify(vars)); } catch {}
-  // 浏览器顶栏颜色、图标和 iOS 启动图（public/themes/<id>/，由 scripts/gen-theme-assets.mjs 生成）。
-  // iOS 只在“添加到主屏幕”那一刻读取图标和启动图，已添加的要删掉重新添加才会换。
-  const base = t.id === DEFAULT_THEME ? "" : `/themes/${t.id}`;
+  // 浏览器顶栏颜色跟着变。桌面图标和 iOS 启动图始终是青绿（iOS 只在添加到主屏幕时读取，网页改不了）。
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.id === DEFAULT_THEME ? "#f7f8f4" : shift("f7f8f4", t.hue, t.sat));
-  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="apple-touch-icon"], link[rel="icon"], link[rel="apple-touch-startup-image"], link[rel="manifest"]')) {
-    const file = new URL(link.href).pathname.split("/").pop()!;
-    const dir = link.rel === "apple-touch-startup-image" ? (base || "/splash") : base;
-    link.href = `${dir}/${file}`;
-  }
 }
 export const THEME_VARS_KEY = "light-meal:theme-vars";
