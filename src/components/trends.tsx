@@ -8,23 +8,38 @@ import type { Meal, WeightEntry } from "@/lib/types";
 import { round1 } from "@/lib/number";
 
 type DayRow = Pick<Meal, "eaten_at" | "calories" | "protein_g">;
-type Props = { supabase: SupabaseClient; goal: number; targetWeight: number | null; refreshKey: number; onPickDay: (date: string) => void };
+type Props = { supabase: SupabaseClient; userId: string; goal: number; targetWeight: number | null; refreshKey: number; onPickDay: (date: string) => void };
 const ranges = [7, 30, 90] as const;
 
-export default function Trends({ supabase, goal, targetWeight, refreshKey, onPickDay }: Props) {
+// 本机缓存每个时间范围上次拉到的数据：打开趋势页先画缓存，后台再刷新，和首页一样不用等网络。
+type Cached = { rows: DayRow[]; weights: WeightEntry[] };
+const cacheKey = (userId: string, range: number) => `light-meal:trends:${userId}:${range}`;
+function readCache(key: string): Cached | null {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
+}
+
+export default function Trends({ supabase, userId, goal, targetWeight, refreshKey, onPickDay }: Props) {
   const [range, setRange] = useState<(typeof ranges)[number]>(7);
-  const [rows, setRows] = useState<DayRow[]>([]);
-  const [weights, setWeights] = useState<WeightEntry[]>([]);
+  const [rows, setRows] = useState<DayRow[]>(() => readCache(cacheKey(userId, 7))?.rows ?? []);
+  const [weights, setWeights] = useState<WeightEntry[]>(() => readCache(cacheKey(userId, 7))?.weights ?? []);
   const days = useMemo(() => Array.from({ length: range }, (_, i) => addDays(todayISO(), i - range + 1)), [range]);
 
   useEffect(() => {
+    const key = cacheKey(userId, range);
+    const cached = readCache(key);
+    if (cached) { setRows(cached.rows); setWeights(cached.weights); }
     const { start } = dayRange(days[0]);
     const { end } = dayRange(days[days.length - 1]);
     Promise.all([
       supabase.from("meal_records").select("eaten_at, calories, protein_g").gte("eaten_at", start).lt("eaten_at", end),
       supabase.from("weight_records").select("*").gte("recorded_on", days[0]).order("recorded_on")
-    ]).then(([m, w]) => { setRows((m.data || []) as DayRow[]); setWeights((w.data || []) as WeightEntry[]); });
-  }, [supabase, days, refreshKey]);
+    ]).then(([m, w]) => {
+      if (m.error || w.error) return; // 网络失败时保留缓存的数据
+      const fresh = { rows: (m.data || []) as DayRow[], weights: (w.data || []) as WeightEntry[] };
+      setRows(fresh.rows); setWeights(fresh.weights);
+      try { localStorage.setItem(key, JSON.stringify(fresh)); } catch {}
+    });
+  }, [supabase, userId, range, days, refreshKey]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, { calories: number; protein: number }>();
