@@ -219,10 +219,11 @@ button.meal-thumb{border:0;padding:0}
 .weight-panel-now strong{font-size:17px;font-weight:500}
 .weight-panel-now strong small{font-size:11px;color:#c7d5c7;font-weight:400}
 .weight-panel-now em{font-style:normal;font-size:11px;color:#c7d5c7;white-space:nowrap}
-.weight-panel-form{display:flex;gap:6px;flex:none}
-.weight-panel-form input{width:76px;border:1px solid #ffffff30;background:#ffffff14;color:#fff;border-radius:9px;padding:6px 8px;font-size:15px;outline:none}
-.weight-panel-form input::placeholder{color:#c7d5c7;font-size:12px}
-.weight-panel-form input:focus{border-color:#d9e4c5}
-.weight-panel-form button{border:0;border-radius:9px;background:#d9e4c5;color:var(--green);font-size:12px;font-weight:600;padding:0 12px}
+/* 输入框和“记录”合成一个胶囊，外观与右上角的日期选择一致 */
+.weight-panel-form{flex:none;display:flex;align-items:center;border:1px solid #ffffff26;background:#ffffff18;border-radius:99px;height:31px;font-size:12px;color:#e8f0e6}
+.weight-panel-form:focus-within{border-color:#ffffff55}
+.weight-panel-form input{width:62px;border:0;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;padding:0 6px 0 11px;outline:none}
+.weight-panel-form input::placeholder{color:#c7d5c7}
+.weight-panel-form button{border:0;border-left:1px solid #ffffff26;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;font-weight:600;padding:0 11px}
 .weight-tip{margin:8px 0 0;font-size:12px;color:#e3ecd9}
 .weight-tip.warn{display:inline-block;background:#fbeceb;color:#c0392b;font-weight:600;border-radius:8px;padding:5px 9px}

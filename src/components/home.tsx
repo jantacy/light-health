@@ -194,10 +194,16 @@ export default function Home() {
     syncNow();
   }
 
+  // 一次性的成功提醒：显示 3 秒后自动关闭（期间换成别的提醒就不动它）。
+  function flash(msg: string) {
+    setNotice(msg);
+    setTimeout(() => setNotice((n) => (n === msg ? "" : n)), 3000);
+  }
+
   async function saveWeight(e: React.FormEvent) {
     e.preventDefault(); const value = Number(weightInput); if (!value || !session) return;
     const { error } = await supabase.from("weight_records").upsert({ user_id: session.user.id, recorded_on: date, weight_kg: value }, { onConflict: "user_id,recorded_on" });
-    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); const msg = `已记录 ${isToday ? "今天" : shortDate(date)}的体重`; setNotice(msg); setTimeout(() => setNotice((n) => n === msg ? "" : n), 3000); }
+    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); flash(`已记录 ${isToday ? "今天" : shortDate(date)}的体重`); }
   }
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><div className="brand-mark"><Leaf size={23}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
@@ -225,7 +231,7 @@ export default function Home() {
     </div>
     {!editing && !showSettings && <nav className="tabbar"><button className={tab === "day" ? "active" : ""} onClick={() => setTab("day")}><Sun size={19}/>每日</button><button className="tab-add" aria-label="记录一餐" onClick={() => setEditing("new")}><Plus size={22}/></button><button className={tab === "trends" ? "active" : ""} onClick={() => setTab("trends")}><BarChart3 size={19}/>趋势</button></nav>}
     {editing && <MealModal supabase={supabase} userId={session.user.id} date={tab === "day" ? date : todayISO()} initial={editing === "new" ? undefined : editing} photoUrls={photoUrls} onSaved={mealSaved} onDeleted={mealDeleted} onClose={() => setEditing(null)}/>}
-    {showSettings && <SettingsModal supabase={supabase} userId={session.user.id} initial={profile} avatarUrl={avatarUrl} onClose={() => setShowSettings(false)} onSaved={(p) => { setProfile(p); setShowSettings(false); setNotice("资料已保存"); }} onAvatarChanged={(p, url) => { setProfile(p); setAvatarUrl(url); }}/>}
+    {showSettings && <SettingsModal supabase={supabase} userId={session.user.id} initial={profile} avatarUrl={avatarUrl} onClose={() => setShowSettings(false)} onSaved={(p) => { setProfile(p); setShowSettings(false); flash("资料已保存"); }} onAvatarChanged={(p, url) => { setProfile(p); setAvatarUrl(url); }}/>}
     {viewing && <PhotoViewer src={viewing} onClose={() => setViewing("")}/>}
   </main>;
 }
