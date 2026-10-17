@@ -155,6 +155,7 @@ button.meal-thumb{border:0;padding:0}
 .welcome-meta .daily-quote{margin-left:5em;font-size:11px;color:#849087;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* 靠右对齐，和日期至少隔 5 个字 */
 .topbar-user{display:flex;align-items:center;gap:0;min-width:0} /* 问候语以全角“！”结尾，字形右边自带空白，不会贴住头像 */
 .topbar-user .greeting{font-size:12px;letter-spacing:.04em;max-width:42vw;line-height:1}
+.topbar-user .greeting em{font-style:normal;color:#6f927d} /* 昵称比“你好”浅一档，和标题“今天也要，好好吃饭”的深浅搭配一致 */
 .welcome h1{margin:13px 0 1px} /* 标题和上方日期、下方健康卡片的视觉间距一致（约 20px） */
 @media(min-width:700px){.welcome{padding-top:20px}}
 @media(max-width:500px){.welcome{padding-top:8px}}
