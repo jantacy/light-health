@@ -242,6 +242,10 @@ function Macro({ label, value, unit, color }: { label: string; value: number; un
 function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }: { latest?: WeightEntry; date: string; target: number | null; gender: Profile["gender"]; input: string; onInput: (v: string) => void; onSubmit: (e: React.FormEvent) => void }) {
   const weight = latest?.recorded_on === date ? Number(latest.weight_kg) : null;
   const hint = latest ? Number(latest.weight_kg) : target ? Number(target) : null;
+  // iPhone 弹出键盘时会把页面往上推，收起后不会自动回来：点输入框前记下位置，离开输入框时滚回去。
+  const scrollBefore = useRef<number | null>(null);
+  const remember = () => { if (scrollBefore.current === null) scrollBefore.current = window.scrollY; };
+  const restore = () => { const top = scrollBefore.current; scrollBefore.current = null; if (top !== null) setTimeout(() => window.scrollTo({ top, behavior: "smooth" }), 60); };
   const diff = weight !== null && target ? Math.round((weight - Number(target)) * 10) / 10 : null;
   const limit = diff !== null && diff > 0 ? 5 : gender === "male" ? 5 : 2.5;
   let tip: string, warn = false;
@@ -259,7 +263,7 @@ function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }:
         {target ? <em>目标 {Number(target).toFixed(1)} kg</em> : null}
       </div>
       <form className="weight-panel-form" onSubmit={onSubmit}>
-        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" value={input} onChange={(e) => onInput(e.target.value)}/>
+        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" onTouchStart={remember} onFocus={remember} onBlur={restore} value={input} onChange={(e) => onInput(e.target.value)}/>
         <button type="submit">记录</button>
       </form>
     </div>
