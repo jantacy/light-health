@@ -1,10 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { foodKey } from "@/lib/food-names";
 
 // 服务端共享食物库（每 100 克营养）。只在服务端用 service role 访问。
 export type Nutrients = { calories: number; protein_g: number; carbs_g: number; fat_g: number };
 type Row = { name: string; display_name: string; calories_100g: number; protein_100g: number; carbs_100g: number; fat_100g: number };
 
-export const normName = (name: string) => name.replace(/\s+/g, "").toLowerCase();
+export const normName = foodKey; // 同义叫法归到同一个库键，见 food-names.ts
 const r1 = (v: number) => Math.round(v * 10) / 10;
 
 export function fromPer100(row: Row, grams: number): Nutrients {

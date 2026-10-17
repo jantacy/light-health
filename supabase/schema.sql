@@ -133,7 +133,7 @@ create table if not exists public.app_settings (key text primary key, value text
 alter table public.app_settings enable row level security;
 insert into public.app_settings (key, value) values ('food_refresh_every', '30') on conflict (key) do nothing;
 
--- 食物使用次数：每保存一条饮食记录，按其中食物名称累加；每满 N 次（app_settings.food_refresh_every）标记待更新，由服务端定时让 AI 重估。
+-- 食物使用次数：每保存一条饮食记录，按其中食物的库键（items[].key，旧记录没有则用名称去空格小写）累加；每满 N 次（app_settings.food_refresh_every）标记待更新，由服务端定时让 AI 重估。
 alter table public.food_library add column if not exists uses integer not null default 0;
 alter table public.food_library add column if not exists needs_refresh boolean not null default false;
 alter table public.food_library add column if not exists refreshed_at timestamptz;
@@ -146,7 +146,7 @@ begin
   update public.food_library f
      set uses = f.uses + c.n,
          needs_refresh = f.needs_refresh or (f.uses % every) + c.n >= every
-    from (select lower(regexp_replace(i->>'name', '\s+', '', 'g')) as k, count(*) as n
+    from (select coalesce(nullif(i->>'key', ''), lower(regexp_replace(i->>'name', '\s+', '', 'g'))) as k, count(*) as n
             from jsonb_array_elements(coalesce(new.dishes, '[]'::jsonb)) d,
                  jsonb_array_elements(coalesce(d->'items', '[]'::jsonb)) i
            group by 1) c
@@ -159,8 +159,12 @@ create trigger meal_records_count_food_uses after insert on public.meal_records 
 -- 服务端认领待更新的食物（多台服务器同时跑也不会重复处理）。
 create or replace function public.claim_food_refresh(max_rows integer default 10) returns setof public.food_library language sql security definer set search_path = public as $$
   update public.food_library set needs_refresh = false
-   where name in (select name from public.food_library where needs_refresh order by uses desc limit max_rows for update skip locked)
+   where name in (select name from public.food_library where needs_refresh and source <> 'cfct' order by uses desc limit max_rows for update skip locked)
   returning *;
 $$;
 revoke all on function public.claim_food_refresh(integer) from public, anon, authenticated;
 revoke all on function public.count_food_uses() from public, anon, authenticated;
+
+-- 《中国食物成分表标准版（第6版）》导入的权威数据：source = 'cfct'，AI 不覆盖、不重估（导入见 scripts/import-cfct.mts）。
+alter table public.food_library drop constraint if exists food_library_source_check;
+alter table public.food_library add constraint food_library_source_check check (source in ('ai', 'photo', 'manual', 'cfct'));

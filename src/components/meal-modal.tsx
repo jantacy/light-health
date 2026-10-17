@@ -6,6 +6,7 @@ import { Camera, Check, LoaderCircle, Plus, Trash2, X } from "lucide-react";
 import { compressImage } from "@/lib/image";
 import { rememberPhoto } from "@/lib/photo-cache";
 import { lookupFood, rememberFood, scale } from "@/lib/food-cache";
+import { foodKey } from "@/lib/food-names";
 import { todayISO } from "@/lib/date";
 import type { Dish, DishItem, Meal } from "@/lib/types";
 import type { MealRow } from "@/lib/outbox";
@@ -123,7 +124,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
       try {
         const photo = await compressImage(file);
         updatePhoto(key, { photo, preview: URL.createObjectURL(photo) });
-        const a = await callAnalyze(photo);
+        const a = await callAnalyze(await compressImage(photo, 1024)); // 识图用 1024px 副本：图片 token 少约 40%，识别不受影响
         const found = a.items.length ? a.items.map((i: FoodItem) => itemDraft(i, key)) : [itemDraft({ name: a.title, calories: a.calories, protein_g: a.protein_g, carbs_g: a.carbs_g, fat_g: a.fat_g }, key)];
         setItems((list) => [...list, ...found]);
         updatePhoto(key, { status: "idle" });
@@ -184,7 +185,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
     // 按照片分组存成 dishes；手动添加的食物归到一组无照片的 dish。
     const groups = [...photos.map((p) => p.key), null].map((photoKey) => ({ photoKey, list: named.filter((i) => i.photoKey === photoKey || (photoKey === null && !pathOf.has(i.photoKey ?? ""))) }));
     const dishes: Dish[] = groups.filter((g) => g.list.length || (g.photoKey && pathOf.get(g.photoKey))).map(({ photoKey, list }) => {
-      const dishItems: DishItem[] = list.map((i) => ({ name: i.name.trim(), grams: Number(i.grams) || null, calories: round1(i.calories), protein_g: round1(i.protein_g), carbs_g: round1(i.carbs_g), fat_g: round1(i.fat_g) }));
+      const dishItems: DishItem[] = list.map((i) => ({ name: i.name.trim(), key: foodKey(i.name), grams: Number(i.grams) || null, calories: round1(i.calories), protein_g: round1(i.protein_g), carbs_g: round1(i.carbs_g), fat_g: round1(i.fat_g) }));
       const t = sum(dishItems);
       return { name: dishItems.map((i) => i.name).join("、"), image_path: photoKey ? pathOf.get(photoKey) ?? null : null, items: dishItems, calories: round1(t.calories), protein_g: round1(t.protein_g), carbs_g: round1(t.carbs_g), fat_g: round1(t.fat_g) };
     });

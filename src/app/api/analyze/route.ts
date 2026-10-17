@@ -1,7 +1,8 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { requireLicense } from "@/lib/require-license";
-import { getVisionProvider, VisionError } from "@/lib/vision";
+import { getVisionProvider, VisionError, type FoodAnalysis } from "@/lib/vision";
 import { fromPer100, lookupFoods, normName, saveFoods } from "@/lib/food-library";
 
 export const runtime = "nodejs";
@@ -13,6 +14,13 @@ function imageMime(b: Buffer) {
   if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
   if (b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") return "image/webp";
   return null;
+}
+
+// 同一张照片（按内容哈希）重复识别时直接用上次的模型结果，不再调用 API。进程内保存最近 200 张。
+const recent = new Map<string, FoodAnalysis>();
+function remember(hash: string, analysis: FoodAnalysis) {
+  recent.set(hash, structuredClone(analysis));
+  if (recent.size > 200) recent.delete(recent.keys().next().value!);
 }
 
 export async function POST(request: Request) {
@@ -30,7 +38,10 @@ export async function POST(request: Request) {
   if (!mime) return NextResponse.json({ error: "识图支持 JPG、PNG、WebP 照片。" }, { status: 415 });
 
   try {
-    const analysis = await provider.analyze({ image: bytes, mime });
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    const cached = recent.get(hash);
+    const analysis = cached ? structuredClone(cached) : await provider.analyze({ image: bytes, mime });
+    if (!cached && analysis.items.length) remember(hash, analysis);
     // 库里已有的食物按库里的单位营养重算（同一种食物前后一致）；新的食物入库。
     const library = await lookupFoods(analysis.items.map((i) => i.name));
     const fresh: Parameters<typeof saveFoods>[0] = [];

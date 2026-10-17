@@ -56,7 +56,7 @@
 .welcome>div:first-child{min-width:0}
 .modal-backdrop{z-index:30}
 .meal-modal{max-height:calc(100dvh - 40px);padding-bottom:calc(25px + env(safe-area-inset-bottom))}
-@media(max-width:500px){.modal-backdrop{padding:12px 0 0}.meal-modal{width:100%;border-radius:23px 23px 0 0;max-height:calc(100dvh - 12px)}}
+@media(max-width:500px){.modal-backdrop{padding:calc(12px + env(safe-area-inset-top)) 0 0}.meal-modal{width:100%;border-radius:23px 23px 0 0;max-height:calc(100dvh - 12px - env(safe-area-inset-top))}}
 @supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
 .date-pill button{border:0;background:transparent;color:inherit;padding:2px;display:grid;place-items:center}
 .date-pill button:disabled{opacity:.3}
