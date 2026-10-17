@@ -9,18 +9,26 @@ import { readTrendStore, syncTrends } from "@/lib/trend-store";
 
 // version：本地趋势数据被首页下拉刷新更新后变化，趋势页重新读取。
 type Props = { supabase: SupabaseClient; userId: string; goal: number; targetWeight: number | null; version: number; onPickDay: (date: string) => void };
-const ranges = [7, 30, 90] as const;
+// "month"：本月 1 号到今天（1–31 天，都在本地保存的 90 天之内）。
+const ranges = [7, 30, 90, "month"] as const;
+type Range = (typeof ranges)[number];
+const rangeLabel = (r: Range) => (r === "month" ? "本月" : `${r} 天`);
+function rangeDays(r: Range) {
+  const today = todayISO();
+  const n = r === "month" ? Number(today.slice(8, 10)) : r;
+  return Array.from({ length: n }, (_, i) => addDays(today, i - n + 1));
+}
 
 export default function Trends({ supabase, userId, goal, targetWeight, version, onPickDay }: Props) {
-  const [range, setRange] = useState<(typeof ranges)[number]>(7);
+  const [range, setRange] = useState<Range>(7);
   const [store, setStore] = useState(() => readTrendStore(userId));
-  const days = useMemo(() => Array.from({ length: range }, (_, i) => addDays(todayISO(), i - range + 1)), [range]);
+  const days = useMemo(() => rangeDays(range), [range]);
 
   // 先画本地数据；本地覆盖不到这个范围时才会真正请求服务端。
   useEffect(() => {
     setStore(readTrendStore(userId));
-    syncTrends(supabase, userId, range).then((next) => { if (next) setStore(next); });
-  }, [supabase, userId, range, version]);
+    syncTrends(supabase, userId, days.length).then((next) => { if (next) setStore(next); });
+  }, [supabase, userId, days, version]);
 
   const logged = days.filter((d) => store.days[d]);
   const avg = (key: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, d) => s + store.days[d][key], 0) / logged.length) : 0;
@@ -28,10 +36,10 @@ export default function Trends({ supabase, userId, goal, targetWeight, version, 
   const delta = weightDays.length > 1 ? round1(store.weights[weightDays[weightDays.length - 1]] - store.weights[weightDays[0]]) : null;
 
   return <div className="trends">
-    <div className="segmented range-switch">{ranges.map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} 天</button>)}</div>
+    <div className="segmented range-switch">{ranges.map((r) => <button key={r} className={range === r ? "active" : ""} onClick={() => setRange(r)}>{rangeLabel(r)}</button>)}</div>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">CALORIE TREND</span><h2>热量趋势</h2></div></div>
       <LineChart points={days.map((d) => ({ date: d, value: store.days[d]?.calories ?? null }))} unit="kcal" goal={goal} fromZero onPickDay={onPickDay}/>
-      <div className="trend-stats"><div><small>记录天数</small><strong>{logged.length}<span>/{range}</span></strong></div><div><small>日均热量</small><strong>{avg("calories")}<span>kcal</span></strong></div><div><small>日均蛋白质</small><strong>{avg("protein")}<span>g</span></strong></div></div>
+      <div className="trend-stats"><div><small>记录天数</small><strong>{logged.length}<span>/{days.length}</span></strong></div><div><small>日均热量</small><strong>{avg("calories")}<span>kcal</span></strong></div><div><small>日均蛋白质</small><strong>{avg("protein")}<span>g</span></strong></div></div>
       <p className="weight-hint">没有记录的日子不计入日均。点图上的某一天可查看明细。</p>
     </section>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">WEIGHT TREND</span><h2>体重变化</h2></div>{delta !== null && <div className="weight-current"><strong>{delta > 0 ? `+${delta}` : delta}</strong><small>kg</small></div>}</div>
@@ -54,7 +62,7 @@ function LineChart({ points, unit, goal, fromZero, onPickDay }: { points: Point[
   const y = (v: number) => 100 - ((v - lo) / (hi - lo || 1)) * 100;
   const coords = points.flatMap((p, i) => (p.value === null ? [] : [{ i, x: x(i), y: y(p.value) }]));
   const path = coords.map((c, k) => `${k ? "L" : "M"}${c.x},${c.y}`).join(" ");
-  const labels = [0, Math.floor((n - 1) / 2), n - 1];
+  const labels = [...new Set([0, Math.floor((n - 1) / 2), n - 1])]; // 只有一两天时去重，避免标签叠在一起
   const sel = active !== null ? points[active] : null;
 
   return <div className="line-chart">
