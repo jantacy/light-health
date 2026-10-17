@@ -1,7 +1,9 @@
 // 主题色：页面里所有青绿色调的颜色（主按钮、健康卡片、选中态、带绿调的深色文字和灰色、底色、分割线、阴影、
 // Logo 等，见 globals.css 里的 var(--c-xxxxxx)）。
-// 换主题时把每个颜色的色相拉到目标色相附近（只保留原来与主色色相差的 1/4，免得浅色点缀跑成别的颜色），
-// 亮度和饱和度保持不变，所以深浅层次和默认的青绿一致。预设都核对过对比度，不低于默认青绿。
+// 换主题时把每个颜色的色相拉到目标色相附近（只保留原来与主色色相差的 1/4，免得浅色点缀跑成别的颜色）。
+// sat / light 调整饱和度和亮度，幅度按 1-|2L-1| 和原饱和度加权：饱和的中间调（主色）变化最大，
+// 很浅的底色、很深的文字和灰色文字几乎不变，
+// 所以深浅层次和默认的青绿一致。每个预设都核对过对比度（白字/主色、主色/底色、卡片文字/主色 ≥ 4.5）。
 // 红色（预警、删除）、橙色（未确认、同步角标）、营养素圆点、白色叠加不属于主题色，不变。
 const BRAND = [
   "0a100ceb", "172a2040", "24392f7a", "263a32", "263a321f", "2e4d3c14", "315f4d", "315f4d20",
@@ -21,31 +23,36 @@ const BRAND = [
 
 // hue：目标色相（默认青绿的主色 #315f4d 是 157）。
 const BASE_HUE = 157, SPREAD = 0.25;
+// 爱马仕橙、玫瑰金的标准色较亮，白字和卡片文字对比度不够，取的是满足 WCAG AA（4.5）时最鲜亮的版本。
 export const THEMES = [
-  { id: "teal", name: "青绿", hue: 157, sat: 1 },
-  { id: "ocean", name: "海蓝", hue: 208, sat: 1 },
-  { id: "indigo", name: "靛紫", hue: 255, sat: 1 },
-  { id: "brown", name: "暖棕", hue: 28, sat: 0.9 },
-  { id: "forest", name: "森绿", hue: 115, sat: 1 },
-  { id: "graphite", name: "石墨", hue: 207, sat: 0.2 }
+  { id: "teal", name: "青绿", hue: 157, sat: 1, light: 0 },
+  { id: "ocean", name: "海蓝", hue: 208, sat: 1, light: 0 },
+  { id: "indigo", name: "靛紫", hue: 255, sat: 1, light: 0 },
+  { id: "orange", name: "爱马仕橙", hue: 22, sat: 3.0, light: 0.08 },
+  { id: "wine", name: "酒红", hue: 353, sat: 1.56, light: 0.07 },
+  { id: "rosegold", name: "玫瑰金", hue: 350, sat: 0.8, light: 0.18 }
 ] as const;
 export type ThemeId = (typeof THEMES)[number]["id"];
 export const DEFAULT_THEME: ThemeId = "teal";
 
-function shift(hex: string, hue: number, sat: number) {
+function shift(hex: string, hue: number, sat: number, light = 0) {
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
   const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
   let h = d === 0 ? 0 : max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
   const diff = ((((h * 60 - BASE_HUE) % 360) + 540) % 360) - 180; // 原色相与主色的差，-180..180
   h = ((((hue + diff * SPREAD) % 360) + 360) % 360);
-  const s2 = Math.min(1, s * sat), c = (1 - Math.abs(2 * l - 1)) * s2, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+  const w = (1 - Math.abs(2 * l - 1)) * Math.min(1, s / 0.3); // 灰色（饱和度低）几乎不受 sat / light 影响
+  const s2 = Math.min(1, s * (1 + (sat - 1) * w)), l2 = Math.min(1, Math.max(0, l + light * w));
+  const c = (1 - Math.abs(2 * l2 - 1)) * s2, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l2 - c / 2;
   const [r2, g2, b2] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
   return "#" + [r2, g2, b2].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("") + hex.slice(6); // 保留透明度
 }
 
 const theme = (id: string | null | undefined) => THEMES.find((t) => t.id === id) ?? THEMES[0];
-export const themeSwatch = (id: ThemeId) => { const t = theme(id); return shift("315f4d", t.hue, t.sat); };
+// 某个主题下的颜色（6 位 hex，不带 #），核对对比度时用。
+export const themedColor = (hex: string, id: string) => { const t = theme(id); return t.id === DEFAULT_THEME ? `#${hex}` : shift(hex, t.hue, t.sat, t.light); };
+export const themeSwatch = (id: ThemeId) => { const t = theme(id); return shift("315f4d", t.hue, t.sat, t.light); };
 
 // 应用主题：写到根元素的 CSS 变量上；同时存一份到本机，layout 里的内联脚本在页面绘制前就套用，避免先闪一下默认色。
 export function applyTheme(id: string | null | undefined) {
@@ -53,10 +60,10 @@ export function applyTheme(id: string | null | undefined) {
   const vars: Record<string, string> = {};
   for (const hex of BRAND) {
     if (t.id === DEFAULT_THEME) root.removeProperty(`--c-${hex}`);
-    else root.setProperty(`--c-${hex}`, (vars[`--c-${hex}`] = shift(hex, t.hue, t.sat)));
+    else root.setProperty(`--c-${hex}`, (vars[`--c-${hex}`] = shift(hex, t.hue, t.sat, t.light)));
   }
   try { localStorage.setItem(THEME_VARS_KEY, JSON.stringify(vars)); } catch {}
   // 浏览器顶栏颜色跟着变。桌面图标和 iOS 启动图始终是青绿（iOS 只在添加到主屏幕时读取，网页改不了）。
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.id === DEFAULT_THEME ? "#f7f8f4" : shift("f7f8f4", t.hue, t.sat));
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t.id === DEFAULT_THEME ? "#f7f8f4" : shift("f7f8f4", t.hue, t.sat, t.light));
 }
 export const THEME_VARS_KEY = "light-meal:theme-vars";
