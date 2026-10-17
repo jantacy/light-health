@@ -17,6 +17,7 @@ import Splash, { todayQuote } from "./splash";
 import PullRefresh from "./pull-refresh";
 import { round1 } from "@/lib/number";
 import { recordDay, syncTrends } from "@/lib/trend-store";
+import { applyTheme } from "@/lib/theme";
 
 const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
@@ -115,10 +116,11 @@ export default function Home() {
 
   // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
   async function loadProfile(retry = true) {
-    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path, calorie_goal, target_weight").maybeSingle();
+    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path, calorie_goal, target_weight, theme").maybeSingle();
     const p = data as Profile | null;
     if (!p) { if (retry) setTimeout(() => loadProfile(false), 1000); return; }
     setProfile(p);
+    applyTheme(p.theme);
     if (p.avatar_path) photoUrl(supabase, "avatars", p.avatar_path).then((url) => setAvatarUrl(url ?? ""));
   }
   useEffect(() => { if (session) loadProfile(); }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps

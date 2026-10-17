@@ -20,5 +20,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f7f8f4", width: "device-width", initialScale: 1, maximumScale: 1, userScalable: false, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body>{children}<SwRegister/></body></html>;
+  // 主题色在页面绘制前套用（见 src/lib/theme.ts），避免先闪一下默认的青绿。
+  const theme = "try{var m=JSON.parse(localStorage.getItem('light-meal:theme-vars')||'{}');for(var k in m)document.documentElement.style.setProperty(k,m[k])}catch(e){}";
+  return <html lang="zh-CN"><head><script dangerouslySetInnerHTML={{ __html: theme }}/></head><body>{children}<SwRegister/></body></html>;
 }

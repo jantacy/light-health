@@ -6,11 +6,12 @@ import { Camera, LoaderCircle, LogOut, X } from "lucide-react";
 import { compressImage } from "@/lib/image";
 import { rememberPhoto } from "@/lib/photo-cache";
 import Avatar from "./avatar";
+import { applyTheme, DEFAULT_THEME, THEMES, themeSwatch } from "@/lib/theme";
 
-export type Profile = { phone: string; nickname: string | null; gender: "male" | "female" | null; birth_month: number | null; birth_day: number | null; avatar_path: string | null; calorie_goal: number | null; target_weight: number | null };
+export type Profile = { phone: string; nickname: string | null; gender: "male" | "female" | null; birth_month: number | null; birth_day: number | null; avatar_path: string | null; calorie_goal: number | null; target_weight: number | null; theme: string | null };
 
 // 星座按公历日期推算：[名称, 该星座在当月的起始日]，按月份索引（1 月从水瓶座 1/20 开始）。
-const signs: [string, number][] = [["摩羯座", 1], ["水瓶座", 20], ["双鱼座", 19], ["白羊座", 21], ["金牛座", 20], ["双子座", 21], ["巨蟹座", 22], ["狮子座", 23], ["处女座", 23], ["天秤座", 23], ["天蝎座", 24], ["射手座", 23], ["摩羯座", 22]];
+const signs: [string, number][] = [["摩羯座 ♑️", 1], ["水瓶座 ♒️", 20], ["双鱼座 ♓️", 19], ["白羊座 ♈️", 21], ["金牛座 ♉️", 20], ["双子座 ♊️", 21], ["巨蟹座 ♋️", 22], ["狮子座 ♌️", 23], ["处女座 ♍️", 23], ["天秤座 ♎️", 23], ["天蝎座 ♏️", 24], ["射手座 ♐️", 23], ["摩羯座 ♑️", 22]];
 export function zodiac(month: number | null, day: number | null) {
   if (!month || !day) return "";
   return day >= signs[month][1] ? signs[month][0] : signs[month - 1][0];
@@ -28,7 +29,8 @@ type Props = {
   onAvatarChanged: (p: Profile, url: string) => void;
 };
 
-export default function SettingsModal({ supabase, userId, initial, avatarUrl, onClose, onSaved, onAvatarChanged }: Props) {
+export default function SettingsModal({ supabase, userId, initial, avatarUrl, onClose: close, onSaved, onAvatarChanged }: Props) {
+  const onClose = () => { applyTheme(initial?.theme); close(); }; // 选了主题没保存就关闭：恢复原来的
   const [profile, setProfile] = useState<Profile | null>(initial);
   const [message, setMessage] = useState("");
   useEffect(() => { if (initial && !profile) setProfile(initial); }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +66,7 @@ export default function SettingsModal({ supabase, userId, initial, avatarUrl, on
     if (profile.target_weight !== null && !(profile.target_weight >= 25 && profile.target_weight <= 300)) { setMessage("目标体重请填 25–300 kg 之间的数。"); return; }
     setSaving(true); setMessage("");
     const day = profile.birth_month && profile.birth_day ? Math.min(profile.birth_day, daysIn(profile.birth_month)) : profile.birth_day;
-    const fields = { nickname: profile.nickname?.trim() || null, gender: profile.gender, birth_month: profile.birth_month, birth_day: day, calorie_goal: profile.calorie_goal, target_weight: profile.target_weight === null ? null : Math.round(profile.target_weight * 10) / 10, updated_at: new Date().toISOString() };
+    const fields = { theme: profile.theme === DEFAULT_THEME ? null : profile.theme, nickname: profile.nickname?.trim() || null, gender: profile.gender, birth_month: profile.birth_month, birth_day: day, calorie_goal: profile.calorie_goal, target_weight: profile.target_weight === null ? null : Math.round(profile.target_weight * 10) / 10, updated_at: new Date().toISOString() };
     const { error } = await supabase.from("user_profiles").update(fields).eq("phone", profile.phone);
     setSaving(false);
     if (error) setMessage("保存失败，请稍后重试。"); else onSaved({ ...profile, ...fields });
@@ -80,17 +82,20 @@ export default function SettingsModal({ supabase, userId, initial, avatarUrl, on
       </button>
       <p className="avatar-hint">点头像更换</p>
       <label className="field-label">手机号<input value={displayPhone(profile.phone)} readOnly disabled/></label>
-      <label className="field-label">昵称<input maxLength={30} placeholder="怎么称呼你" value={profile.nickname ?? ""} onChange={(e) => set({ nickname: e.target.value })}/></label>
-      <div className="field-label">性别<div className="segmented gender-switch">{([["female", "女"], ["male", "男"]] as const).map(([v, label]) => <button type="button" key={v} className={profile.gender === v ? "active" : ""} onClick={() => set({ gender: v })}>{label}</button>)}</div></div>
-      <div className="form-row">
+      <div className="form-row name-row">
+        <label className="field-label">昵称<input maxLength={30} placeholder="怎么称呼你" value={profile.nickname ?? ""} onChange={(e) => set({ nickname: e.target.value })}/></label>
+        <div className="field-label">性别<div className="segmented gender-switch">{([["female", "女"], ["male", "男"]] as const).map(([v, label]) => <button type="button" key={v} className={profile.gender === v ? "active" : ""} onClick={() => set({ gender: v })}>{label}</button>)}</div></div>
+      </div>
+      <div className="form-row three">
         <label className="field-label">生日（月）<select value={profile.birth_month ?? ""} onChange={(e) => set({ birth_month: e.target.value ? Number(e.target.value) : null })}><option value="">未设置</option>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1} 月</option>)}</select></label>
         <label className="field-label">生日（日）<select value={profile.birth_day ?? ""} onChange={(e) => set({ birth_day: e.target.value ? Number(e.target.value) : null })}><option value="">未设置</option>{Array.from({ length: daysIn(profile.birth_month || 1) }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1} 日</option>)}</select></label>
+        <label className="field-label">星座<input value={zodiac(profile.birth_month, profile.birth_day) || "—"} readOnly disabled/></label>
       </div>
       <div className="form-row">
         <label className="field-label">热量阈值（kcal/天）<input type="number" inputMode="numeric" min={800} max={5000} step={50} placeholder="2000" value={profile.calorie_goal ?? ""} onChange={(e) => set({ calorie_goal: e.target.value ? Number(e.target.value) : null })}/></label>
         <label className="field-label">目标体重（kg）<input type="number" inputMode="decimal" min={25} max={300} step={0.1} placeholder="未设置" value={profile.target_weight ?? ""} onChange={(e) => set({ target_weight: e.target.value ? Number(e.target.value) : null })}/></label>
       </div>
-      <label className="field-label">星座<input value={zodiac(profile.birth_month, profile.birth_day) || "设置生日后自动生成"} readOnly disabled/></label>
+      <div className="field-label">主题色<div className="theme-picker">{THEMES.map((t) => <button type="button" key={t.id} className={(profile.theme ?? DEFAULT_THEME) === t.id ? "active" : ""} onClick={() => { set({ theme: t.id }); applyTheme(t.id); }}><i style={{ background: themeSwatch(t.id) }}/>{t.name}</button>)}</div></div>
       {message && <p className="form-message">{message}</p>}
       <button className="primary-button save-button" disabled={saving}>{saving ? "正在保存…" : "保存"}</button>
     </form>}

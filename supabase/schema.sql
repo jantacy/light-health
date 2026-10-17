@@ -113,6 +113,9 @@ grant update (calorie_goal) on public.user_profiles to authenticated;
 -- 目标体重（kg），首页按最近一次体重算差额。
 alter table public.user_profiles add column if not exists target_weight numeric(4,1) check (target_weight between 25 and 300);
 grant update (target_weight) on public.user_profiles to authenticated;
+-- 主题色（src/lib/theme.ts 里的预设 id，空为默认青绿）。
+alter table public.user_profiles add column if not exists theme text check (theme ~ '^[a-z]{1,20}$');
+grant update (theme) on public.user_profiles to authenticated;
 
 -- 共享食物库：每 100 克的营养。AI 估算或识图得到的结果写入这里，之后同名食物直接查库，不再调用 AI。
 -- 只允许服务端（service role）访问。
