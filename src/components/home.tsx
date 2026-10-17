@@ -5,7 +5,8 @@ import { BarChart3, Camera, ChevronLeft, ChevronRight, Leaf, Plus, Scale, Sun } 
 import { createClient, migrateCookieSession } from "@/lib/supabase/client";
 import { addDays, dayRange, localDay, shortDate, shortWeekday, todayISO } from "@/lib/date";
 import type { Meal, WeightEntry } from "@/lib/types";
-import MealModal, { mealLabels } from "./meal-modal";
+import MealModal, { mealLabels, storedPaths } from "./meal-modal";
+import SwipeRow from "./swipe-row";
 import Trends from "./trends";
 import DateField from "./date-field";
 import PhotoViewer from "./photo-viewer";
@@ -15,7 +16,7 @@ import { photoUrl, prunePhotos } from "@/lib/photo-cache";
 import { applyPending, enqueue, flush, onOutboxChange, readJobs, type MealRow } from "@/lib/outbox";
 import Splash, { refreshQuotes, todayQuote } from "./splash";
 
-const GOAL = 2000;
+const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
 function readCache(key: string): { meals: Meal[]; weights: WeightEntry[] } | null {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
@@ -84,13 +85,19 @@ export default function Home() {
 
   // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
   async function loadProfile(retry = true) {
-    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path").maybeSingle();
+    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path, calorie_goal").maybeSingle();
     const p = data as Profile | null;
     if (!p) { if (retry) setTimeout(() => loadProfile(false), 1000); return; }
     setProfile(p);
     if (p.avatar_path) photoUrl(supabase, "avatars", p.avatar_path).then((url) => setAvatarUrl(url ?? ""));
   }
   useEffect(() => { if (session) loadProfile(); }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 热量阈值存在资料里；本机记一份，启动时资料还没读回来也不会先闪成默认值。
+  const goalKey = `light-meal:goal:${session?.user?.id}`;
+  const cachedGoal = useMemo(() => { try { return Number(localStorage.getItem(goalKey)) || null; } catch { return null; } }, [goalKey]);
+  const GOAL = profile?.calorie_goal || cachedGoal || DEFAULT_GOAL;
+  useEffect(() => { if (profile) { try { localStorage.setItem(goalKey, String(profile.calorie_goal ?? "")); } catch {} } }, [profile, goalKey]);
 
   // 体重默认记在正在查看的那天，也可以改日期补录。
   useEffect(() => setWeightDate(selectedDate), [selectedDate]);
@@ -214,7 +221,7 @@ export default function Home() {
       <section className="welcome"><div><div className="welcome-meta"><span className="eyebrow">{greetingDate}</span>{profile?.nickname && <span className="greeting">你好，{profile.nickname}！</span>}</div><h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1><p className="daily-quote">{quote}</p></div></section>
       <section className="summary-card"><div className="summary-head"><h2>{isToday ? "今日摄入" : `${shortDate(date)} 摄入`}</h2><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div></section>
       <section className="section meal-section"><div className="section-heading"><div><span className="eyebrow">YOUR DAY</span><h2>饮食记录 <span className="count">{meals.length}</span></h2></div><button className="text-button" onClick={() => setEditing("new")}><Plus size={17}/> 添加一餐</button></div>
-        <div className="meal-list">{meals.length ? meals.map((item) => <div className="meal-row" role="button" tabIndex={0} key={item.id} onClick={() => setEditing(item)}>{item.image_path && photoUrls[item.image_path] ? <button className="meal-thumb" aria-label="查看照片" onClick={(e) => { e.stopPropagation(); setViewing(photoUrls[item.image_path!]); }}><img src={photoUrls[item.image_path]} alt=""/></button> : <div className="meal-thumb"><img src="/default-meal.svg" alt=""/></div>}<div className="meal-info"><span>{mealLabels[item.meal_type]} <small>{new Date(item.eaten_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}{item.dishes?.length > 1 && ` · ${item.dishes.length} 道菜`}{pending.has(item.id) && <em className="sync-badge">同步中</em>}</small></span><strong>{item.title}</strong></div><div className="meal-calories"><strong>{Math.round(Number(item.calories))}</strong><small>kcal</small></div></div>) : <div className="empty-meals"><div className="empty-icon"><Camera size={20}/></div><strong>还没有饮食记录</strong><span>{isToday ? "从今天的第一餐开始吧" : "可以为这一天补记"}</span><button onClick={() => setEditing("new")}>记录一餐 <ChevronRight size={15}/></button></div>}</div>
+        <div className="meal-list">{meals.length ? meals.map((item) => <SwipeRow key={item.id} onDelete={() => mealDeleted(item.id, storedPaths(item))}><div className="meal-row" role="button" tabIndex={0} onClick={() => setEditing(item)}>{item.image_path && photoUrls[item.image_path] ? <button className="meal-thumb" aria-label="查看照片" onClick={(e) => { e.stopPropagation(); setViewing(photoUrls[item.image_path!]); }}><img src={photoUrls[item.image_path]} alt=""/></button> : <div className="meal-thumb"><img src="/default-meal.svg" alt=""/></div>}<div className="meal-info"><span>{mealLabels[item.meal_type]} <small>{new Date(item.eaten_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}{item.dishes?.length > 1 && ` · ${item.dishes.length} 道菜`}{pending.has(item.id) && <em className="sync-badge">同步中</em>}</small></span><strong>{item.title}</strong></div><div className="meal-calories"><strong>{Math.round(Number(item.calories))}</strong><small>kcal</small></div></div></SwipeRow>) : <div className="empty-meals"><div className="empty-icon"><Camera size={20}/></div><strong>还没有饮食记录</strong><span>{isToday ? "从今天的第一餐开始吧" : "可以为这一天补记"}</span><button onClick={() => setEditing("new")}>记录一餐 <ChevronRight size={15}/></button></div>}</div>
       </section>
       <section className="section weight-section"><div className="section-heading"><div><span className="eyebrow">GENTLE PROGRESS</span><h2>体重记录</h2></div><div className="weight-current"><Scale size={17}/><strong>{currentWeight ? `${currentWeight}` : "—"}</strong><small>kg</small></div></div><DateField value={weightDate} onChange={setWeightDate}/><form className="weight-form" onSubmit={saveWeight}><input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder="体重 kg" value={weightInput} onChange={(e) => setWeightInput(e.target.value)}/><button type="submit">记录体重</button></form>{weights.length > 1 ? <div className="weight-history">{weights.slice().reverse().map((w) => <span key={w.id}><i style={{ height: `${Math.max(15, Math.min(70, (w.weight_kg - 35) * 2))}px` }}/><small>{shortDate(w.recorded_on)}</small></span>)}</div> : <p className="weight-hint">轻轻记录，不必追求每天都变化。</p>}</section>
       </>}

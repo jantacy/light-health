@@ -95,6 +95,12 @@ html,body{max-width:100%;overflow-x:clip;-webkit-text-size-adjust:100%;text-size
 /* 记录行：点缩略图看大图，点其他地方编辑 */
 .meal-row{cursor:pointer}
 button.meal-thumb{border:0;padding:0}
+/* 饮食记录左滑删除 */
+.swipe-row{position:relative;overflow:hidden;border-bottom:1px solid var(--line)}
+.swipe-row .meal-row{border-bottom:0}
+.swipe-content{position:relative;background:var(--paper);touch-action:pan-y}
+.swipe-content.settle{transition:transform .22s ease}
+.swipe-delete{position:absolute;top:0;right:0;bottom:0;border:0;background:#d9534a;color:#fff;font-size:13px;font-weight:600}
 .photo-viewer{position:fixed;inset:0;z-index:50;background:rgba(10,16,12,.92);display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
 .photo-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .photo-viewer-close{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:99px;width:40px;height:40px;display:grid;place-items:center}

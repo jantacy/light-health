@@ -73,7 +73,7 @@ function draftsFrom(meal: Meal | undefined, photoUrls: Record<string, string>) {
   }
   return { photos, items };
 }
-const storedPaths = (meal?: Meal) => draftsFrom(meal, {}).photos.map((p) => p.image_path).filter((p): p is string => !!p);
+export const storedPaths = (meal?: Meal) => draftsFrom(meal, {}).photos.map((p) => p.image_path).filter((p): p is string => !!p);
 
 type Props = {
   supabase: SupabaseClient;
