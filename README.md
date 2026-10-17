@@ -5,6 +5,14 @@
 - 技术栈：Next.js 15（App Router，standalone 输出）+ Supabase（Postgres / Auth / Storage）+ OpenAI 兼容的视觉/语言模型（默认 DeepSeek）
 - 部署：自建 Linux 服务器（nginx + systemd），可多台同时运行，前面可以套 Cloudflare 等 CDN
 
+## 界面
+
+| 首页 | 记录一餐 | 趋势 | 设置 |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/home.png" width="200" alt="首页：今日健康、体重、饮食记录"> | <img src="docs/screenshots/record.png" width="200" alt="记录一餐：拍照识别、逐项食物、合计"> | <img src="docs/screenshots/trends.png" width="200" alt="趋势：热量和体重折线图，带目标线"> | <img src="docs/screenshots/settings.png" width="200" alt="设置：头像、昵称、生日、热量阈值、目标体重"> |
+
+截图用的是测试账号和演示数据。
+
 ## 功能
 
 | 模块 | 说明 |
