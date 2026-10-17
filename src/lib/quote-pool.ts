@@ -1,6 +1,7 @@
 // 每日箴言：固定 60 条，积极、健康、简短，分两组，每组 15 条中文 + 15 条英文。
 // 首页把它放在日期同一行靠右，和日期之间至少留 5 个字，所以每句宽度不超过约 15 个汉字
 // （英文字母按半个汉字算）。新增或替换句子时注意这个宽度。
+// 英文统一用小写（风格选择），但专有名词照常大写，所以直接写在句子里，不用 CSS 转换。
 const groups = [
   [
     "好好吃饭，就是好好爱自己。",
@@ -18,21 +19,21 @@ const groups = [
     "吃得清淡，活得明朗。",
     "小小的坚持，会有大大的改变。",
     "身体是一切的本钱。",
-    "Eat well, live well.",
-    "Small steps every day.",
-    "Progress, not perfection.",
-    "Take care of your body.",
-    "Health is the real wealth.",
-    "Each meal, a fresh start.",
-    "Be kind to your body.",
-    "Drink water, rest, repeat.",
-    "Slow down and savor it.",
-    "Strong body, calm mind.",
-    "Eat slowly, live fully.",
-    "Move a little more today.",
-    "Sleep is self-care.",
-    "Fuel your body with love.",
-    "One good meal at a time."
+    "eat well, live well.",
+    "small steps every day.",
+    "progress, not perfection.",
+    "take care of your body.",
+    "health is the real wealth.",
+    "each meal, a fresh start.",
+    "be kind to your body.",
+    "drink water, rest, repeat.",
+    "slow down and savor it.",
+    "strong body, calm mind.",
+    "eat slowly, live fully.",
+    "move a little more today.",
+    "sleep is self-care.",
+    "fuel your body with love.",
+    "one good meal at a time."
   ],
   [
     "细嚼慢咽，享受每一口。",
@@ -50,21 +51,21 @@ const groups = [
     "给自己一顿用心的饭。",
     "晒晒太阳，心也暖起来。",
     "慢慢来，比较快。",
-    "Balance beats extremes.",
-    "You are worth the effort.",
-    "Greens make the day.",
-    "Rest well, rise strong.",
-    "Consistency is the key.",
-    "Breathe deep, eat slow.",
-    "Good food, good mood.",
-    "Walk it off, feel better.",
-    "Listen to your body.",
-    "Little habits, big change.",
-    "Nourish, don't punish.",
-    "Today is a fresh plate.",
-    "Treat your body kindly.",
-    "Water first, then coffee.",
-    "Choose what fuels you."
+    "balance beats extremes.",
+    "you are worth the effort.",
+    "greens make the day.",
+    "rest well, rise strong.",
+    "consistency is the key.",
+    "breathe deep, eat slow.",
+    "good food, good mood.",
+    "walk it off, feel better.",
+    "listen to your body.",
+    "little habits, big change.",
+    "nourish, don't punish.",
+    "today is a fresh plate.",
+    "treat your body kindly.",
+    "water first, then coffee.",
+    "choose what fuels you."
   ]
 ];
 
