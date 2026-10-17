@@ -70,7 +70,6 @@ export default function Home() {
 
   useEffect(() => {
     migrateCookieSession(supabase).then(() => supabase.auth.getSession()).then(({ data }) => setSession(data.session ?? null));
-    setQuote(todayQuote());
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
@@ -103,6 +102,16 @@ export default function Home() {
     const timer = setInterval(() => setRefreshKey((k) => k + 1), 10000);
     return () => clearInterval(timer);
   }, [loadFailed]);
+
+  // 每日箴言：同一天只显示一句（由日期决定）。App 在后台跨过零点时，切回前台或每分钟检查一次，换成新一天的句子。
+  useEffect(() => {
+    const update = () => setQuote(todayQuote());
+    const onVisible = () => { if (document.visibilityState === "visible") update(); };
+    update();
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(update, 60000);
+    return () => { document.removeEventListener("visibilitychange", onVisible); clearInterval(timer); };
+  }, []);
 
   // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
   async function loadProfile(retry = true) {
