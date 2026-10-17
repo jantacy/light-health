@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fallbackQuote } from "@/lib/quote-pool";
+import { fallbackQuote, quoteFits } from "@/lib/quote-pool";
 import { getModelConfig } from "@/lib/vision";
 
 export const runtime = "nodejs";
@@ -15,8 +15,7 @@ let pending: Promise<void> | null = null;
 const shanghaiDate = (offset: number) => new Date(Date.now() + offset * 86400000).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
 
 function acceptable(text: string) {
-  if (!text || negative.test(text)) return false;
-  return /[一-鿿]/.test(text) ? [...text].length <= 20 : text.split(/\s+/).length <= 10;
+  return !!text && !negative.test(text) && quoteFits(text);
 }
 
 async function generate(dates: string[]) {
@@ -33,7 +32,7 @@ async function generate(dates: string[]) {
       max_tokens: 3000, // 模型会先推理，推理 token 也计入上限
       messages: [{
         role: "user",
-        content: `写 ${dates.length} 句积极、健康、向上的短句，用在饮食记录 App 的启动页，不需要是名人名言。要求：温和自然，主题覆盖好好吃饭、运动、睡眠、心态；中文和英文大致各一半；中文不超过 18 个字，英文不超过 8 个词；不要署名和出处，不要说教，彼此不重复${recent.length ? `，也不要和这些重复：${recent.join(" / ")}` : ""}。只返回 JSON 字符串数组。`
+        content: `写 ${dates.length} 句积极、健康、向上的短句，用在饮食记录 App 的启动页，不需要是名人名言。要求：温和自然，主题覆盖好好吃饭、运动、睡眠、心态；中文和英文大致各一半；中文不超过 14 个字（含标点），英文不超过 26 个字母（含空格，约 5 个词）；不要署名和出处，不要说教，彼此不重复${recent.length ? `，也不要和这些重复：${recent.join(" / ")}` : ""}。只返回 JSON 字符串数组。`
       }]
     })
   });

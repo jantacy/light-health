@@ -151,7 +151,10 @@ button.meal-thumb{border:0;padding:0}
 .welcome>div:first-child{flex:1;align-self:stretch}
 .welcome-meta{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .greeting{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--green);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.welcome .daily-quote{min-height:1.5em}
+.welcome-meta .eyebrow{white-space:nowrap}
+.welcome-meta .daily-quote{margin-left:5em;font-size:11px;color:#849087;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} /* 靠右对齐，和日期至少隔 5 个字 */
+.topbar-user{display:flex;align-items:center;gap:10px;min-width:0}
+.topbar-user .greeting{font-size:12px;letter-spacing:.04em;max-width:42vw}
 .welcome h1{margin-top:6px}
 @media(min-width:700px){.welcome{padding-top:20px}}
 @media(max-width:500px){.welcome{padding-top:8px}}

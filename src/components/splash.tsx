@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fallbackQuote } from "@/lib/quote-pool";
+import { fallbackQuote, quoteFits } from "@/lib/quote-pool";
 import { todayISO } from "@/lib/date";
 
 const KEY = "light-meal:quotes";
@@ -23,7 +23,8 @@ export function refreshQuotes(): Promise<void> {
 
 export function todayQuote() {
   const today = todayISO();
-  return readQuotes()[today] || fallbackQuote(today);
+  const cached = readQuotes()[today];
+  return cached && quoteFits(cached) ? cached : fallbackQuote(today); // 旧规则生成的长句不再显示
 }
 
 export default function Splash() {

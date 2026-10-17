@@ -27,9 +27,18 @@ export const quotePool = [
   "Strong body, calm mind."
 ];
 
+// 首页箴言和日期在同一行、靠右对齐，和日期之间至少留 5 个字的空。按最窄的 375pt 屏幕算，
+// 箴言最多约 15 个汉字宽；英文字母按半个汉字宽估算（留了余量）。
+export function quoteFits(text: string) {
+  let width = 0;
+  for (const c of text) width += /[\u2e80-\uffff]/.test(c) ? 1 : 0.55;
+  return width <= 15;
+}
+
 // 按日期稳定地挑一句，同一天看到的是同一句。
 export function fallbackQuote(date: string) {
+  const pool = quotePool.filter(quoteFits);
   let h = 0;
   for (const c of date) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return quotePool[h % quotePool.length];
+  return pool[h % pool.length];
 }
