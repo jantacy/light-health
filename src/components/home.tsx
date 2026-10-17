@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Camera, ChevronLeft, ChevronRight, Leaf, Plus, Scale, Sun } from "lucide-react";
+import { BarChart3, Camera, ChevronLeft, ChevronRight, Leaf, Plus, Sun } from "lucide-react";
 import { createClient, migrateCookieSession } from "@/lib/supabase/client";
 import { addDays, dayRange, localDay, shortDate, shortWeekday, todayISO } from "@/lib/date";
 import type { Meal, WeightEntry } from "@/lib/types";
 import MealModal, { mealLabels, storedPaths } from "./meal-modal";
 import SwipeRow from "./swipe-row";
 import Trends from "./trends";
-import DateField from "./date-field";
 import PhotoViewer from "./photo-viewer";
 import SettingsModal, { type Profile } from "./settings-modal";
 import Avatar from "./avatar";
@@ -40,7 +39,6 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [weightInput, setWeightInput] = useState("");
   const [selectedDate, setSelectedDate] = useState(todayISO);
-  const [weightDate, setWeightDate] = useState(todayISO);
   const [viewing, setViewing] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -85,7 +83,7 @@ export default function Home() {
 
   // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
   async function loadProfile(retry = true) {
-    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path, calorie_goal").maybeSingle();
+    const { data } = await supabase.from("user_profiles").select("phone, nickname, gender, birth_month, birth_day, avatar_path, calorie_goal, target_weight").maybeSingle();
     const p = data as Profile | null;
     if (!p) { if (retry) setTimeout(() => loadProfile(false), 1000); return; }
     setProfile(p);
@@ -93,14 +91,13 @@ export default function Home() {
   }
   useEffect(() => { if (session) loadProfile(); }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 热量阈值存在资料里；本机记一份，启动时资料还没读回来也不会先闪成默认值。
-  const goalKey = `light-meal:goal:${session?.user?.id}`;
-  const cachedGoal = useMemo(() => { try { return Number(localStorage.getItem(goalKey)) || null; } catch { return null; } }, [goalKey]);
-  const GOAL = profile?.calorie_goal || cachedGoal || DEFAULT_GOAL;
-  useEffect(() => { if (profile) { try { localStorage.setItem(goalKey, String(profile.calorie_goal ?? "")); } catch {} } }, [profile, goalKey]);
+  // 热量阈值、目标体重、性别存在资料里；本机记一份，启动时资料还没读回来也不会先闪成默认值。
+  const targetsKey = `light-meal:targets:${session?.user?.id}`;
+  const cachedTargets = useMemo((): Partial<Profile> => { try { return JSON.parse(localStorage.getItem(targetsKey) || "{}"); } catch { return {}; } }, [targetsKey]);
+  const targets = profile ?? cachedTargets;
+  const GOAL = targets.calorie_goal || DEFAULT_GOAL;
+  useEffect(() => { if (profile) { try { localStorage.setItem(targetsKey, JSON.stringify({ calorie_goal: profile.calorie_goal, target_weight: profile.target_weight, gender: profile.gender })); } catch {} } }, [profile, targetsKey]);
 
-  // 体重默认记在正在查看的那天，也可以改日期补录。
-  useEffect(() => setWeightDate(selectedDate), [selectedDate]);
 
   // 后台同步队列：登录后、联网恢复时、以及有待同步任务时每分钟同步一次。
   const uid: string | undefined = session?.user?.id;
@@ -126,7 +123,6 @@ export default function Home() {
   }, [meals, supabase]);
 
   const totals = useMemo(() => meals.reduce((a, m) => ({ calories: a.calories + Number(m.calories), protein: a.protein + Number(m.protein_g), carbs: a.carbs + Number(m.carbs_g), fat: a.fat + Number(m.fat_g) }), { calories: 0, protein: 0, carbs: 0, fat: 0 }), [meals]);
-  const currentWeight = weights[0]?.weight_kg;
   const dateObject = new Date(`${date}T12:00:00`);
   const greetingDate = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(dateObject);
   const isToday = date === todayISO();
@@ -200,8 +196,8 @@ export default function Home() {
 
   async function saveWeight(e: React.FormEvent) {
     e.preventDefault(); const value = Number(weightInput); if (!value || !session) return;
-    const { error } = await supabase.from("weight_records").upsert({ user_id: session.user.id, recorded_on: weightDate, weight_kg: value }, { onConflict: "user_id,recorded_on" });
-    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); const msg = `已记录 ${shortDate(weightDate)} 的体重`; setNotice(msg); setTimeout(() => setNotice((n) => n === msg ? "" : n), 3000); }
+    const { error } = await supabase.from("weight_records").upsert({ user_id: session.user.id, recorded_on: date, weight_kg: value }, { onConflict: "user_id,recorded_on" });
+    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); const msg = `已记录 ${isToday ? "今天" : shortDate(date)}的体重`; setNotice(msg); setTimeout(() => setNotice((n) => n === msg ? "" : n), 3000); }
   }
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><div className="brand-mark"><Leaf size={23}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
@@ -219,11 +215,11 @@ export default function Home() {
         : notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {tab === "trends" ? <Trends supabase={supabase} goal={GOAL} refreshKey={refreshKey} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>
       <section className="welcome"><div><div className="welcome-meta"><span className="eyebrow">{greetingDate}</span>{profile?.nickname && <span className="greeting">你好，{profile.nickname}！</span>}</div><h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1><p className="daily-quote">{quote}</p></div></section>
-      <section className="summary-card"><div className="summary-head"><h2>{isToday ? "今日摄入" : `${shortDate(date)} 摄入`}</h2><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div></section>
+      <section className="summary-card"><div className="summary-head"><h2>{isToday ? "今日健康" : `${shortDate(date)} 健康`}</h2><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div>
+        <WeightPanel latest={weights[0]} date={date} isToday={isToday} target={targets.target_weight ?? null} gender={targets.gender ?? null} input={weightInput} onInput={setWeightInput} onSubmit={saveWeight}/></section>
       <section className="section meal-section"><div className="section-heading"><div><span className="eyebrow">YOUR DAY</span><h2>饮食记录 <span className="count">{meals.length}</span></h2></div><button className="text-button" onClick={() => setEditing("new")}><Plus size={17}/> 添加一餐</button></div>
         <div className="meal-list">{meals.length ? meals.map((item) => <SwipeRow key={item.id} onDelete={() => mealDeleted(item.id, storedPaths(item))}><div className="meal-row" role="button" tabIndex={0} onClick={() => setEditing(item)}>{item.image_path && photoUrls[item.image_path] ? <button className="meal-thumb" aria-label="查看照片" onClick={(e) => { e.stopPropagation(); setViewing(photoUrls[item.image_path!]); }}><img src={photoUrls[item.image_path]} alt=""/></button> : <div className="meal-thumb"><img src="/default-meal.svg" alt=""/></div>}<div className="meal-info"><span>{mealLabels[item.meal_type]} <small>{new Date(item.eaten_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}{item.dishes?.length > 1 && ` · ${item.dishes.length} 道菜`}{pending.has(item.id) && <em className="sync-badge">同步中</em>}</small></span><strong>{item.title}</strong></div><div className="meal-calories"><strong>{Math.round(Number(item.calories))}</strong><small>kcal</small></div></div></SwipeRow>) : <div className="empty-meals"><div className="empty-icon"><Camera size={20}/></div><strong>还没有饮食记录</strong><span>{isToday ? "从今天的第一餐开始吧" : "可以为这一天补记"}</span><button onClick={() => setEditing("new")}>记录一餐 <ChevronRight size={15}/></button></div>}</div>
       </section>
-      <section className="section weight-section"><div className="section-heading"><div><span className="eyebrow">GENTLE PROGRESS</span><h2>体重记录</h2></div><div className="weight-current"><Scale size={17}/><strong>{currentWeight ? `${currentWeight}` : "—"}</strong><small>kg</small></div></div><DateField value={weightDate} onChange={setWeightDate}/><form className="weight-form" onSubmit={saveWeight}><input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder="体重 kg" value={weightInput} onChange={(e) => setWeightInput(e.target.value)}/><button type="submit">记录体重</button></form>{weights.length > 1 ? <div className="weight-history">{weights.slice().reverse().map((w) => <span key={w.id}><i style={{ height: `${Math.max(15, Math.min(70, (w.weight_kg - 35) * 2))}px` }}/><small>{shortDate(w.recorded_on)}</small></span>)}</div> : <p className="weight-hint">轻轻记录，不必追求每天都变化。</p>}</section>
       </>}
       <footer>慢慢来，身体会记得你的用心。</footer>
     </div>
@@ -235,3 +231,31 @@ export default function Home() {
 }
 
 function Macro({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) { return <div className="macro"><span><i className={color}/>{label}</span><strong>{Math.round(value)}<small>{unit}</small></strong></div>; }
+
+// 体重与目标体重的差额：当天没记就用之前最近的一次。高于目标超过 5kg、或低于目标太多（男 5kg、女或未设性别 2.5kg）时标红预警。
+function WeightPanel({ latest, date, isToday, target, gender, input, onInput, onSubmit }: { latest?: WeightEntry; date: string; isToday: boolean; target: number | null; gender: Profile["gender"]; input: string; onInput: (v: string) => void; onSubmit: (e: React.FormEvent) => void }) {
+  const weight = latest ? Number(latest.weight_kg) : null;
+  const diff = weight !== null && target ? Math.round((weight - Number(target)) * 10) / 10 : null;
+  const limit = diff !== null && diff > 0 ? 5 : gender === "male" ? 5 : 2.5;
+  let tip: string, warn = false;
+  if (weight === null) tip = "记录一下体重，看看离目标还有多远";
+  else if (diff === null) tip = "在设置里填上目标体重，这里会帮你算差额";
+  else if (Math.abs(diff) > limit) { tip = `预警：已${diff > 0 ? "高" : "低"}于目标 ${Math.abs(diff).toFixed(1)} kg，请注意合理控制体重！`; warn = true; }
+  else if (diff > 0) tip = `距目标还差 ${diff.toFixed(1)} kg，请继续加油哦～`;
+  else if (diff === 0) tip = "刚好达到目标体重，你真的太棒了！";
+  else tip = `已低于目标 ${(-diff).toFixed(1)} kg，你真的太棒了！`;
+  return <div className="weight-panel">
+    <div className="weight-panel-row">
+      <div className="weight-panel-now">
+        <span>体重{latest && latest.recorded_on !== date && <small>（{shortDate(latest.recorded_on)}）</small>}</span>
+        <strong>{weight !== null ? weight.toFixed(1) : "—"}<small> kg</small></strong>
+        {target ? <em>目标 {Number(target).toFixed(1)} kg</em> : null}
+      </div>
+      <form className="weight-panel-form" onSubmit={onSubmit}>
+        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={isToday ? "今天 kg" : `${shortDate(date)} kg`} aria-label="记录体重" value={input} onChange={(e) => onInput(e.target.value)}/>
+        <button type="submit">记录</button>
+      </form>
+    </div>
+    <p className={`weight-tip${warn ? " warn" : ""}`}>{tip}</p>
+  </div>;
+}

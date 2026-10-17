@@ -108,6 +108,9 @@ create policy "Users delete own avatar" on storage.objects for delete to authent
 -- 每日热量阈值（kcal），首页进度和趋势图的目标线用；为空时按 2000。
 alter table public.user_profiles add column if not exists calorie_goal smallint check (calorie_goal between 800 and 5000);
 grant update (calorie_goal) on public.user_profiles to authenticated;
+-- 目标体重（kg），首页按最近一次体重算差额。
+alter table public.user_profiles add column if not exists target_weight numeric(4,1) check (target_weight between 25 and 300);
+grant update (target_weight) on public.user_profiles to authenticated;
 
 -- 共享食物库：每 100 克的营养。AI 估算或识图得到的结果写入这里，之后同名食物直接查库，不再调用 AI。
 -- 只允许服务端（service role）访问。
