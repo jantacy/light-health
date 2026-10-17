@@ -23,11 +23,11 @@ const BRAND = [
 
 // hue：目标色相（默认青绿的主色 #315f4d 是 157）。
 const BASE_HUE = 157, SPREAD = 0.25;
-// 爱马仕橙、玫瑰金的标准色较亮，白字和卡片文字对比度不够，取的是满足 WCAG AA（4.5）时最鲜亮的版本。
+// 翡冷翠（多乐士 74GG 60/059 #BCCCC9）、爱马仕橙、玫瑰金的原色较亮，白字和卡片文字对比度不够，取的是满足 WCAG AA（4.5）时最接近原色的版本。
 export const THEMES = [
   { id: "teal", name: "青绿", hue: 157, sat: 1, light: 0 },
   { id: "ocean", name: "海蓝", hue: 208, sat: 1, light: 0 },
-  { id: "violet", name: "紫罗兰", hue: 282, sat: 4.8, light: 0.22 },
+  { id: "florence", name: "翡冷翠", hue: 169, sat: 0, light: 0.06 },
   { id: "orange", name: "爱马仕橙", hue: 22, sat: 3.0, light: 0.08 },
   { id: "wine", name: "酒红", hue: 353, sat: 1.56, light: 0.07 },
   { id: "rosegold", name: "玫瑰金", hue: 350, sat: 0.8, light: 0.18 }
