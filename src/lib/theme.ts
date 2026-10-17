@@ -26,7 +26,7 @@ const BASE_HUE = 157, SPREAD = 0.25;
 // 翡冷翠（多乐士 74GG 60/059 #BCCCC9）、爱马仕橙、玫瑰金的原色较亮，白字和卡片文字对比度不够，取的是满足 WCAG AA（4.5）时最接近原色的版本。
 export const THEMES = [
   { id: "teal", name: "青绿", hue: 157, sat: 1, light: 0 },
-  { id: "ocean", name: "海蓝", hue: 208, sat: 1, light: 0 },
+  { id: "inkblue", name: "墨海蓝", hue: 219, sat: 2.6, light: -0.04 },
   { id: "florence", name: "翡冷翠", hue: 169, sat: 0, light: 0.06 },
   { id: "orange", name: "爱马仕橙", hue: 22, sat: 3.0, light: 0.08 },
   { id: "wine", name: "酒红", hue: 353, sat: 1.56, light: 0.07 },
