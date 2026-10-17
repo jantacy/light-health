@@ -174,6 +174,8 @@ button.meal-thumb{border:0;padding:0}
 .photo-tile-remove{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:2px solid var(--paper);background:#5f7064;color:#fff;display:grid;place-items:center;padding:0}
 .photo-add{flex:none;width:68px;height:68px;border:1px dashed #b9cab7;border-radius:12px;background:#f0f4ee;color:#4c6b52;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
 .photo-add span{font-size:10px;font-weight:600;white-space:nowrap}
+.photo-hint{margin:0;padding:0 0 0 4px;list-style:none;align-self:center;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#8a978c}
+.photo-hint li:before{content:"· ";color:#b9cab7;font-weight:700}
 .food-table{margin-top:12px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 10px 6px}
 .food-head,.food-row{display:grid;grid-template-columns:minmax(0,1fr) 76px 60px 32px;gap:6px;align-items:center}
 .food-head{padding:0 2px 6px}
@@ -193,7 +195,6 @@ button.meal-thumb{border:0;padding:0}
 .food-row.dirty .food-confirm{border-color:var(--green);background:var(--green);color:#fff;box-shadow:0 0 0 3px #315f4d22}
 .food-row.error .food-confirm{border-color:#b0655d;background:#fff;color:#b0655d}
 .food-error{grid-column:1/-1;margin:0;font-size:11px;color:#b0655d}
-.food-empty{margin:6px 2px 4px;font-size:12px;color:#9aa69c}
 .food-add{width:100%;margin-top:4px;border:0;border-top:1px dashed #e2e8df;background:transparent;color:var(--green);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;padding:10px 0 6px}
 
 /* 记录弹窗不显示标题：关闭按钮浮在右上角，日期/餐次行留出位置 */

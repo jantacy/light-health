@@ -50,6 +50,8 @@ export default function Home() {
   const [syncDone, setSyncDone] = useState(false);
   const pendingCount = useRef(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [newVersion, setNewVersion] = useState(""); // 服务器上有比当前页面更新的版本
+  const [updateStuck, setUpdateStuck] = useState(false); // 自动刷新过一次仍是旧版本
   const requestedPhotos = useRef(new Set<string>());
   const date = selectedDate;
 
@@ -139,6 +141,30 @@ export default function Home() {
     finally { setLoggingIn(false); }
   }
 
+  // 新版本检测：启动、回到前台、每 10 分钟各查一次。
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    const check = () => fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then(({ version }) => {
+      if (version && version !== process.env.NEXT_PUBLIC_BUILD_ID) setNewVersion(version);
+    }).catch(() => {});
+    const onVisible = () => { if (document.visibilityState === "visible") check(); };
+    check();
+    document.addEventListener("visibilitychange", onVisible);
+    const timer = setInterval(check, 600000);
+    return () => { document.removeEventListener("visibilitychange", onVisible); clearInterval(timer); };
+  }, []);
+
+  // 有新版本时自动刷新：先删掉 Service Worker 缓存的旧页面，否则刷新后还是旧版。
+  // 记录/设置弹窗开着时先不刷新，免得丢掉正在填的内容；同一版本只自动刷新一次，防止循环。
+  useEffect(() => {
+    if (!newVersion || editing || showSettings) return;
+    try { if (sessionStorage.getItem("light-meal:reloaded-for") === newVersion) { setUpdateStuck(true); return; } sessionStorage.setItem("light-meal:reloaded-for", newVersion); } catch {}
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("light-meal-v")).map((k) => caches.open(k).then((c) => c.delete("/", { ignoreSearch: true })))))
+      .catch(() => {})
+      .finally(() => location.reload());
+  }, [newVersion, editing, showSettings]);
+
   // 同步提示：从“有待同步”变为“全部同步完”时显示 3 秒。
   useEffect(() => {
     const prev = pendingCount.current;
@@ -168,7 +194,7 @@ export default function Home() {
   async function saveWeight(e: React.FormEvent) {
     e.preventDefault(); const value = Number(weightInput); if (!value || !session) return;
     const { error } = await supabase.from("weight_records").upsert({ user_id: session.user.id, recorded_on: weightDate, weight_kg: value }, { onConflict: "user_id,recorded_on" });
-    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); setNotice(`已记录 ${shortDate(weightDate)} 的体重`); }
+    if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); const msg = `已记录 ${shortDate(weightDate)} 的体重`; setNotice(msg); setTimeout(() => setNotice((n) => n === msg ? "" : n), 3000); }
   }
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><div className="brand-mark"><Leaf size={23}/></div><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
@@ -180,7 +206,8 @@ export default function Home() {
   return <main className="app-shell">
     <header className="topbar"><a className="wordmark" href="#top"><span className="brand-mark small"><Leaf size={17}/></span>轻食记</a><button className="avatar-button" aria-label="设置" onClick={() => { if (!profile) loadProfile(false); setShowSettings(true); }}><Avatar src={avatarUrl} name={profile?.nickname}/></button></header>
     <div className="dashboard" id="top">
-      {pending.size > 0 ? <div className="notice syncing" role="status">正在同步 {pending.size} 条记录，请等待！{retrying && "（网络不稳定，会自动重试）"}</div>
+      {newVersion ? <div className="notice syncing" role="status">{updateStuck ? "发现新版本，请彻底关闭应用后重新打开！" : editing || showSettings ? "发现新版本，关闭弹窗后自动更新" : "发现新版本，正在更新…"}</div>
+        : pending.size > 0 ? <div className="notice syncing" role="status">正在同步 {pending.size} 条记录，请等待！{retrying && "（网络不稳定，会自动重试）"}</div>
         : syncDone ? <div className="notice" role="status">所有饮食记录已同步！</div>
         : notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
       {tab === "trends" ? <Trends supabase={supabase} goal={GOAL} refreshKey={refreshKey} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>

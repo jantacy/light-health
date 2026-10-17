@@ -220,6 +220,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
           <button type="button" className="photo-tile-remove" aria-label="删除这张照片及其食物" onClick={() => removePhoto(p.key)}><X size={12}/></button>
         </div>)}
         <button type="button" className="photo-add" onClick={() => fileInput.current?.click()}><Camera size={20}/><span>{photos.length ? "再拍一张" : "拍照 / 上传"}</span></button>
+        {!photos.length && <ul className="photo-hint"><li>有照片后自动识别</li><li>也可以直接手动添加</li><li>还可添加照片以外的食物</li></ul>}
       </div>
       {analyzing.length > 0 && <p className="dish-status"><LoaderCircle className="spin" size={14}/> AI 正在识别 {analyzing.length} 张照片…</p>}
       {photos.filter((p) => p.status === "error").map((p) => <p className="dish-status error" key={p.key}>有一张照片识别失败：{p.message}，可以手动添加食物。</p>)}
@@ -235,7 +236,6 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
           </button>
           {i.state === "error" && i.message && <p className="food-error">{i.message}</p>}
         </div>)}
-        {!items.length && !analyzing.length && <p className="food-empty">拍照后自动识别，识别出几种食物就列几行。</p>}
         <button type="button" className="food-add" onClick={() => setItems((list) => [...list, itemDraft({ name: "" }, null, "dirty")])}><Plus size={14}/> 添加食物</button>
       </div>
       {items.length > 0 && <p className="analysis-disclaimer">名称或重量不对就直接改，再点 ✓ 重新计算（只改重量会在本地直接换算）；清空名称再点后面的按钮可删除这一行。</p>}
