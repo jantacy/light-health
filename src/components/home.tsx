@@ -24,6 +24,8 @@ function writeCache(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+const STALE_NOTICE = "网络不稳定，显示的是上次加载的数据，正在重试…";
+
 export default function Home() {
   const [supabase] = useState(createClient);
   const [session, setSession] = useState<any>(undefined); // undefined：还在读取登录状态，显示启动页
@@ -49,6 +51,7 @@ export default function Home() {
   const [syncDone, setSyncDone] = useState(false);
   const pendingCount = useRef(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadFailed, setLoadFailed] = useState(false); // 当天数据没拉到，每 10 秒重试
   const [newVersion, setNewVersion] = useState(""); // 服务器上有比当前页面更新的版本
   const [updateStuck, setUpdateStuck] = useState(false); // 自动刷新过一次仍是旧版本
   const requestedPhotos = useRef(new Set<string>());
@@ -72,14 +75,22 @@ export default function Home() {
       // 网络失败时用本机上次缓存的当天数据，避免 Supabase 连不上时页面变空。
       const key = `light-meal:day:${session.user.id}:${date}`;
       if (m.error || w.error) {
+        setLoadFailed(true);
         const cached = readCache(key);
-        if (cached) { setMeals(applyPending(cached.meals, readJobs(session.user.id), (x) => localDay(x.eaten_at) === date)); setWeights(cached.weights); setNotice("网络不稳定，显示的是上次加载的数据"); }
+        if (cached) { setMeals(applyPending(cached.meals, readJobs(session.user.id), (x) => localDay(x.eaten_at) === date)); setWeights(cached.weights); setNotice(STALE_NOTICE); }
         return;
       }
+      setLoadFailed(false); setNotice((n) => (n === STALE_NOTICE ? "" : n));
       setMeals(applyPending((m.data || []) as Meal[], readJobs(session.user.id), (x) => localDay(x.eaten_at) === date)); setWeights((w.data || []) as WeightEntry[]);
       writeCache(key, { meals: m.data, weights: w.data });
     });
   }, [session, date, supabase, refreshKey]);
+
+  useEffect(() => {
+    if (!loadFailed) return;
+    const timer = setInterval(() => setRefreshKey((k) => k + 1), 10000);
+    return () => clearInterval(timer);
+  }, [loadFailed]);
 
   // 昵称和头像。刚登录时客户端可能还没带上新令牌、RLS 会返回空，所以空结果时 1 秒后重试一次。
   async function loadProfile(retry = true) {
