@@ -8,10 +8,10 @@ import type { Meal, WeightEntry } from "@/lib/types";
 import { round1 } from "@/lib/number";
 
 type DayRow = Pick<Meal, "eaten_at" | "calories" | "protein_g">;
-type Props = { supabase: SupabaseClient; goal: number; refreshKey: number; onPickDay: (date: string) => void };
+type Props = { supabase: SupabaseClient; goal: number; targetWeight: number | null; refreshKey: number; onPickDay: (date: string) => void };
 const ranges = [7, 30, 90] as const;
 
-export default function Trends({ supabase, goal, refreshKey, onPickDay }: Props) {
+export default function Trends({ supabase, goal, targetWeight, refreshKey, onPickDay }: Props) {
   const [range, setRange] = useState<(typeof ranges)[number]>(7);
   const [rows, setRows] = useState<DayRow[]>([]);
   const [weights, setWeights] = useState<WeightEntry[]>([]);
@@ -46,24 +46,25 @@ export default function Trends({ supabase, goal, refreshKey, onPickDay }: Props)
   return <div className="trends">
     <div className="segmented range-switch">{ranges.map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} 天</button>)}</div>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">CALORIE TREND</span><h2>热量趋势</h2></div></div>
-      <LineChart points={days.map((d) => ({ date: d, value: byDay.get(d)?.calories ?? null }))} unit="kcal" goal={goal} onPickDay={onPickDay}/>
+      <LineChart points={days.map((d) => ({ date: d, value: byDay.get(d)?.calories ?? null }))} unit="kcal" goal={goal} fromZero onPickDay={onPickDay}/>
       <div className="trend-stats"><div><small>记录天数</small><strong>{logged.length}<span>/{range}</span></strong></div><div><small>日均热量</small><strong>{avg("calories")}<span>kcal</span></strong></div><div><small>日均蛋白质</small><strong>{avg("protein")}<span>g</span></strong></div></div>
       <p className="weight-hint">没有记录的日子不计入日均。点图上的某一天可查看明细。</p>
     </section>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">WEIGHT TREND</span><h2>体重变化</h2></div>{delta !== null && <div className="weight-current"><strong>{delta > 0 ? `+${delta}` : delta}</strong><small>kg</small></div>}</div>
-      {weights.length > 1 ? <LineChart points={days.map((d) => ({ date: d, value: weightByDay.get(d) ?? null }))} unit="kg" onPickDay={onPickDay}/> : <p className="weight-hint">这段时间记录两次以上体重后显示曲线。</p>}
+      {weights.length > 1 ? <LineChart points={days.map((d) => ({ date: d, value: weightByDay.get(d) ?? null }))} unit="kg" goal={targetWeight ?? undefined} onPickDay={onPickDay}/> : <p className="weight-hint">这段时间记录两次以上体重后显示曲线。</p>}
     </section>
   </div>;
 }
 
 type Point = { date: string; value: number | null };
 
-function LineChart({ points, unit, goal, onPickDay }: { points: Point[]; unit: string; goal?: number; onPickDay: (date: string) => void }) {
+// fromZero：热量从 0 起画，超过目标的点标色。否则（体重）按实际范围上下留白，范围包含目标线。
+function LineChart({ points, unit, goal, fromZero, onPickDay }: { points: Point[]; unit: string; goal?: number; fromZero?: boolean; onPickDay: (date: string) => void }) {
   const [active, setActive] = useState<number | null>(null);
   const values = points.map((p) => p.value).filter((v): v is number => v !== null);
-  // 热量从 0 起画并给目标线留空间；体重按实际范围上下留白。
-  const lo = goal !== undefined ? 0 : Math.min(...values) - 1;
-  const hi = goal !== undefined ? Math.max(goal * 1.2, ...values) : Math.max(...values) + 1;
+  const span = goal !== undefined ? [...values, goal] : values;
+  const lo = fromZero ? 0 : Math.min(...span) - 1;
+  const hi = fromZero ? Math.max((goal ?? 0) * 1.2, ...values) : Math.max(...span) + 1;
   const n = points.length;
   const x = (i: number) => (n === 1 ? 50 : (i / (n - 1)) * 100);
   const y = (v: number) => 100 - ((v - lo) / (hi - lo || 1)) * 100;
@@ -75,9 +76,9 @@ function LineChart({ points, unit, goal, onPickDay }: { points: Point[]; unit: s
   return <div className="line-chart">
     <div className="line-chart-info">{sel ? <><span>{weekdayDate(sel.date)}</span><strong>{sel.value === null ? "无记录" : `${round1(sel.value)} ${unit}`}</strong><button onClick={() => onPickDay(sel.date)}>查看这天 <ChevronRight size={13}/></button></> : <span>点图表查看某一天</span>}</div>
     <div className="line-chart-plot">
-      {goal !== undefined && <i className="goal-line" style={{ top: `${y(goal)}%` }}><span>目标 {goal}</span></i>}
+      {goal !== undefined && <i className="goal-line" style={{ top: `${y(goal)}%` }}><span>目标 {round1(goal)}</span></i>}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d={path} vectorEffect="non-scaling-stroke"/></svg>
-      {coords.map((c) => <i key={c.i} className={`dot${active === c.i ? " active" : ""}${goal !== undefined && points[c.i].value! > goal ? " over" : ""}`} style={{ left: `${c.x}%`, top: `${c.y}%` }}/>)}
+      {coords.map((c) => <i key={c.i} className={`dot${active === c.i ? " active" : ""}${fromZero && goal !== undefined && points[c.i].value! > goal ? " over" : ""}`} style={{ left: `${c.x}%`, top: `${c.y}%` }}/>)}
       {active !== null && <i className="cursor" style={{ left: `${x(active)}%` }}/>}
       <div className="hit-areas">{points.map((p, i) => <button key={p.date} aria-label={p.date} onClick={() => setActive(i)}/>)}</div>
     </div>
