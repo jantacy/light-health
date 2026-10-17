@@ -27,7 +27,7 @@ const BASE_HUE = 157, SPREAD = 0.25;
 export const THEMES = [
   { id: "teal", name: "青绿", hue: 157, sat: 1, light: 0 },
   { id: "ocean", name: "海蓝", hue: 208, sat: 1, light: 0 },
-  { id: "indigo", name: "靛紫", hue: 255, sat: 1, light: 0 },
+  { id: "violet", name: "紫罗兰", hue: 282, sat: 4.8, light: 0.22 },
   { id: "orange", name: "爱马仕橙", hue: 22, sat: 3.0, light: 0.08 },
   { id: "wine", name: "酒红", hue: 353, sat: 1.56, light: 0.07 },
   { id: "rosegold", name: "玫瑰金", hue: 350, sat: 0.8, light: 0.18 }
