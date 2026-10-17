@@ -7,6 +7,7 @@ import { compressImage } from "@/lib/image";
 import { rememberPhoto } from "@/lib/photo-cache";
 import { lookupFood, rememberFood, scale } from "@/lib/food-cache";
 import { foodKey } from "@/lib/food-names";
+import { parseFood, splitFoods } from "@/lib/split-foods";
 import { todayISO } from "@/lib/date";
 import type { Dish, DishItem, Meal } from "@/lib/types";
 import type { MealRow } from "@/lib/outbox";
@@ -139,9 +140,20 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
 
   // 确认：名称为空 → 删除这一行；只改了重量 → 按比例本地换算；本地食物库有这个名称 → 本地换算；否则问 AI（只走语言模型）。
   async function confirmItem(item: ItemDraft) {
-    const name = item.name.trim();
+    let name = item.name.trim();
     if (!name) { setItems((list) => list.filter((i) => i.key !== item.key)); return; }
-    const grams = Number(item.grams) || 0;
+    // 一行写了多种食物（“红烧鲫鱼100g，番茄炒蛋100g”）：拆成多行，各自估算。
+    const parts = splitFoods(name);
+    if (parts) {
+      const drafts = parts.map((p) => ({ ...itemDraft({ name: p.name }, item.photoKey, "dirty"), grams: p.grams ? String(p.grams) : "" }));
+      setItems((list) => list.flatMap((i) => (i.key === item.key ? drafts : [i])));
+      drafts.forEach((d) => confirmItem(d));
+      return;
+    }
+    // 重量写进了名称（“番茄炒蛋 200g”）而重量栏空着：挪到重量栏。
+    let grams = Number(item.grams) || 0;
+    const parsed = parseFood(name);
+    if (parsed.grams && !grams) { name = parsed.name; grams = parsed.grams; updateItem(item.key, { name, grams: String(grams) }); }
     const done = (n: { calories: number; protein_g: number; carbs_g: number; fat_g: number }, g: number) => {
       rememberFood(name, g, n);
       updateItem(item.key, { ...n, grams: g ? String(g) : "", state: "ok", message: undefined, baseName: name, baseGrams: g });
@@ -239,7 +251,7 @@ export default function MealModal({ supabase, userId, date: initialDate, initial
         </div>)}
         <button type="button" className="food-add" onClick={() => setItems((list) => [...list, itemDraft({ name: "" }, null, "dirty")])}><Plus size={14}/> 添加食物</button>
       </div>
-      {items.length > 0 && <p className="analysis-disclaimer">名称或重量不对就直接改，再点 ✓ 重新计算（只改重量会在本地直接换算）；清空名称再点后面的按钮可删除这一行。</p>}
+      {items.length > 0 && <p className="analysis-disclaimer">名称或重量不对就直接改，再点 ✓ 重新计算（只改重量会在本地直接换算）；多种食物可以用逗号隔开写在一行，点 ✓ 会自动拆开；清空名称再点后面的按钮可删除这一行。</p>}
 
       {items.length > 0 && <div className="meal-total"><span>合计</span><strong>{Math.round(totals.calories)}<small> kcal</small></strong><span>蛋白 {Math.round(totals.protein_g)}g · 碳水 {Math.round(totals.carbs_g)}g · 脂肪 {Math.round(totals.fat_g)}g</span></div>}
 
