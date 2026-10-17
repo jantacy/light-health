@@ -58,3 +58,19 @@ self.addEventListener("fetch", (event) => {
   else if (url.pathname.startsWith("/_next/static/")) event.respondWith(cacheFirst(request));
   else event.respondWith(staleWhileRevalidate(request));
 });
+
+// 饭点提醒（服务端 src/lib/meal-reminders.ts 推送）。
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(data.title || "轻食记", { body: data.body, tag: data.tag, icon: "/icon-192.png", badge: "/icon-192.png", data: { url: data.url || "/" } }));
+});
+
+// 点通知：已打开就切到前台，否则打开应用。
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const client = list.find((c) => new URL(c.url).origin === self.location.origin);
+    return client ? client.focus() : self.clients.openWindow(url);
+  }));
+});

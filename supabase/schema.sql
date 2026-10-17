@@ -174,3 +174,34 @@ revoke all on function public.count_food_uses() from public, anon, authenticated
 -- 管理页（/admin）手动修改或新增的记为 source = 'manual'，同样不被 AI 重估。
 alter table public.food_library drop constraint if exists food_library_source_check;
 alter table public.food_library add constraint food_library_source_check check (source in ('ai', 'photo', 'manual', 'cfct'));
+
+-- 饭点提醒（Web Push）：每台设备一条订阅，tz 是设备时区（如 Asia/Shanghai），按它判断“当天”和提醒时间。
+-- 用户只能增删自己的订阅；发送由服务端定时任务（src/lib/meal-reminders.ts）完成。
+create table if not exists public.push_subscriptions (
+  endpoint text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  tz text not null default 'Asia/Shanghai' check (char_length(tz) <= 64),
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "Users read own push subscriptions" on public.push_subscriptions;
+create policy "Users read own push subscriptions" on public.push_subscriptions for select to authenticated using (auth.uid() = user_id);
+drop policy if exists "Users add own push subscriptions" on public.push_subscriptions;
+create policy "Users add own push subscriptions" on public.push_subscriptions for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists "Users edit own push subscriptions" on public.push_subscriptions;
+create policy "Users edit own push subscriptions" on public.push_subscriptions for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Users delete own push subscriptions" on public.push_subscriptions;
+create policy "Users delete own push subscriptions" on public.push_subscriptions for delete to authenticated using (auth.uid() = user_id);
+
+-- 每个用户每天每餐只检查/提醒一次：多台服务器同时运行时，靠主键认领去重。仅服务端访问。
+create table if not exists public.meal_reminders_sent (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  day date not null,
+  meal_type text not null check (meal_type in ('breakfast', 'lunch', 'dinner')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, day, meal_type)
+);
+alter table public.meal_reminders_sent enable row level security;

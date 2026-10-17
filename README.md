@@ -24,7 +24,8 @@
 | 饮食记录 | 点记录编辑，点照片看大图；像 iOS 一样左滑露出"删除"（编辑页里也能删） |
 | 体重 | 在今日健康卡片里直接记录，记在正在查看的那一天（每天一条），立即算出与目标体重的差额；输入不限小数位，存两位，显示保留一位 |
 | 趋势 | 热量和体重折线图（都有目标线），7 / 30 / 90 天和本月，默认 30 天；点某一天查看或跳转；手机上一屏放下 |
-| 设置 | 头像（可自行更换）、昵称、性别、生日（月日）、星座（由生日推算，带 emoji）、热量阈值（默认 2000 kcal/天）、目标体重、主题色（6 个预设） |
+| 设置 | 头像（可自行更换）、昵称、性别、生日（月日）、星座（由生日推算，带 emoji）、热量阈值（默认 2000 kcal/天）、目标体重、主题色（6 个预设）、饭点提醒开关 |
+| 饭点提醒 | 在设置里开启后，08:30 / 12:30 / 20:00 检查当天的早饭 / 午饭 / 晚饭，还没记录才推送通知，点通知打开 App。一次开启三餐都提醒，按设备时区算；同一账号的多台设备都会收到。iPhone 需 iOS 16.4+，并从主屏幕图标打开后开启 |
 | 更新 | 发布新版本后，打开 App 或切回前台时自动检测并刷新；也可以在页面顶部下拉刷新，有新版本就更新，没有就只刷新数据 |
 | 启动页 / 首页 | iOS 启动图 + 应用内启动页，显示每日一句积极、健康的短句；首页顶栏头像旁显示"你好，昵称！"，每日一句在日期同一行靠右 |
 | 离线 | 页面、照片、食物数据本地缓存；保存先落本地，后台同步 |
@@ -48,7 +49,7 @@
 
 ```
 iPhone（PWA）
- ├─ Service Worker：页面缓存秒开、静态资源缓存
+ ├─ Service Worker：页面缓存秒开、静态资源缓存、接收推送通知
  ├─ 本地：照片缓存（7 天）、食物库缓存（7 天）、趋势数据（90 天）、待同步队列
  ├─ Supabase（直连，RLS 只能读写自己的数据）：饮食、体重、资料、照片、头像
  └─ 你的域名（CDN → nginx → Next.js）
@@ -60,10 +61,10 @@ iPhone（PWA）
       ├─ /api/estimate       按名称 + 重量估算（先查食物库，再问语言模型）
       ├─ /api/quotes         未来 10 天的每日一句（只给旧版前端用，新版本地计算）
       ├─ /api/version        当前运行的构建版本（前端据此自动更新）
-      └─ 后台任务            每 30 分钟按使用次数重估常用食物
+      └─ 后台任务            每 30 分钟按使用次数重估常用食物；每分钟检查饭点提醒并发 Web Push
 ```
 
-服务端密钥（service role、模型 API key、管理员密钥）只在服务器上，浏览器拿不到。
+服务端密钥（service role、模型 API key、管理员密钥、VAPID 私钥）只在服务器上，浏览器拿不到。
 
 ## 目录
 
@@ -74,6 +75,8 @@ src/lib/vision/          模型 provider：OpenAI 兼容接口、返回结果解
 src/lib/food-library.ts  服务端共享食物库读写
 src/lib/food-names.ts    食物名称归一化（同义叫法 → 同一个库键），服务端和手机共用
 src/lib/food-refresh.ts  食物库定时重估（由 src/instrumentation.ts 启动）
+src/lib/meal-reminders.ts 饭点提醒定时推送（由 src/instrumentation.ts 启动）
+src/lib/push.ts          浏览器端开启 / 关闭推送订阅
 src/lib/food-cache.ts    手机本地食物库
 src/lib/trend-store.ts   趋势页的本地数据（最近 90 天每天的汇总）
 src/lib/theme.ts         主题色预设和切换
@@ -96,6 +99,8 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
 | `weight_records` | 每天一条体重 | 本人 |
 | `food_library` | 共享食物库，每 100 克营养，含来源 `source`（`cfct` 成分表 / `ai` / `photo` / `manual` 管理页手动改过或新增）、使用次数 `uses`、待更新标记 `needs_refresh` | 仅服务端 |
 | `app_settings` | 键值配置，如 `food_refresh_every` | 仅服务端 / SQL |
+| `push_subscriptions` | 每台设备的推送订阅（endpoint、密钥、设备时区 `tz`）；退出登录或关闭提醒时删除，推送服务返回 404/410 时服务端自动删除 | 本人可增删 |
+| `meal_reminders_sent` | 某用户某天某餐已检查过（主键去重，多台服务器同时运行也只发一次），保留 7 天 | 仅服务端 |
 | `meal-photos` 桶 | 饮食照片，按用户 ID 分目录 | 本人 |
 | `avatars` 桶 | 头像，按用户 ID 分目录 | 本人 |
 
@@ -172,6 +177,7 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
    - `SUPABASE_SERVICE_ROLE_KEY`（只在服务端用，不能加 `NEXT_PUBLIC_` 前缀）
    - `LICENSE_ADMIN_SECRET`（至少 32 位随机字符）
    - `VISION_PROVIDER`、`VISION_API_KEY`（可选 `VISION_BASE_URL`、`VISION_MODEL`）
+   - 饭点提醒：`NEXT_PUBLIC_VAPID_PUBLIC_KEY`、`VAPID_PRIVATE_KEY`（`npx web-push generate-vapid-keys` 生成，换密钥后已有订阅全部失效）、`VAPID_SUBJECT`（站点 https 地址或 `mailto:`）。不填则不启用提醒
 2. 执行 `supabase/schema.sql`（SQL Editor，或 `npx supabase db query --linked --project-ref <ref> -f supabase/schema.sql`）。
 3. 启动：
 
@@ -225,3 +231,4 @@ curl -s --resolve <域名>:443:127.0.0.1 https://<域名>/   # 在服务器上�
 ## 已知限制
 
 - 照片从 Supabase Storage 直接加载，首次查看和上传受用户到 Supabase 区域的网络影响。
+- 饭点提醒：iPhone 走苹果推送服务，国内可用；安卓 Chrome 的推送走 Google FCM，国内一般收不到。提醒时间固定，暂不能自定义。

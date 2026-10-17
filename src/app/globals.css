@@ -75,6 +75,8 @@ html,body{max-width:100%;overflow-x:clip;-webkit-text-size-adjust:100%;text-size
 .settings-button{border:1px solid var(--c-e2e9df,#e2e9df);background:#fff;border-radius:99px;padding:7px 13px;display:flex;align-items:center;gap:6px;color:var(--c-5f7064,#5f7064);font-size:13px}
 .gender-switch{align-self:flex-start}
 .gender-switch button{padding:7px 22px;font-size:14px}
+.reminder-row{display:flex;align-items:center;gap:12px}
+.reminder-row span{font-size:11px;line-height:1.5;color:var(--c-9aa69c,#9aa69c);font-weight:400}
 .field-label input:disabled{color:var(--c-7d8a80,#7d8a80);background:var(--c-f1f4ef,#f1f4ef);-webkit-text-fill-color:var(--c-7d8a80,#7d8a80);opacity:1}
 
 /* 日期选择：显示带星期的文字，点击触发系统日期选择 */

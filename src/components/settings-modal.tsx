@@ -7,6 +7,7 @@ import { compressImage } from "@/lib/image";
 import { rememberPhoto } from "@/lib/photo-cache";
 import Avatar from "./avatar";
 import { applyTheme, DEFAULT_THEME, THEMES, themeSwatch } from "@/lib/theme";
+import { disableReminder, enableReminder, reminderEnabled } from "@/lib/push";
 
 export type Profile = { phone: string; nickname: string | null; gender: "male" | "female" | null; birth_month: number | null; birth_day: number | null; avatar_path: string | null; calorie_goal: number | null; target_weight: number | null; theme: string | null };
 
@@ -37,6 +38,18 @@ export default function SettingsModal({ supabase, userId, initial, avatarUrl, on
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [reminder, setReminder] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  useEffect(() => { reminderEnabled().then(setReminder).catch(() => {}); }, []);
+
+  // 饭点提醒开关：立即生效，不走“保存”。
+  async function toggleReminder(on: boolean) {
+    if (on === reminder || reminderBusy) return;
+    setReminderBusy(true); setMessage("");
+    try { if (on) await enableReminder(supabase, userId); else await disableReminder(supabase); setReminder(on); }
+    catch (err) { setMessage(err instanceof Error ? err.message : "操作失败，请稍后重试。"); }
+    finally { setReminderBusy(false); }
+  }
 
   // 换头像：压缩到 512px 上传到自己的目录，写入资料后删掉旧图。
   async function changeAvatar(file?: File) {
@@ -96,9 +109,10 @@ export default function SettingsModal({ supabase, userId, initial, avatarUrl, on
         <label className="field-label">目标体重（kg）<input type="number" inputMode="decimal" min={25} max={300} step={0.1} placeholder="未设置" value={profile.target_weight ?? ""} onChange={(e) => set({ target_weight: e.target.value ? Number(e.target.value) : null })}/></label>
       </div>
       <div className="field-label">主题色<div className="theme-picker">{THEMES.map((t) => <button type="button" key={t.id} className={(profile.theme ?? DEFAULT_THEME) === t.id ? "active" : ""} onClick={() => { set({ theme: t.id }); applyTheme(t.id); }}><i style={{ background: themeSwatch(t.id) }}/>{t.name}</button>)}</div></div>
+      <div className="field-label">饭点提醒<div className="reminder-row"><div className="segmented gender-switch">{([[false, "关闭"], [true, "开启"]] as const).map(([v, label]) => <button type="button" key={label} className={reminder === v ? "active" : ""} disabled={reminderBusy} onClick={() => toggleReminder(v)}>{label}</button>)}</div><span>08:30 早饭 · 12:30 午饭 · 20:00 晚饭<br/>当餐还没记录才提醒</span></div></div>
       {message && <p className="form-message">{message}</p>}
       <button className="primary-button save-button" disabled={saving}>{saving ? "正在保存…" : "保存"}</button>
     </form>}
-    <button type="button" className="delete-button" onClick={() => supabase.auth.signOut()}><LogOut size={15}/> 退出登录</button>
+    <button type="button" className="delete-button" onClick={async () => { await disableReminder(supabase).catch(() => {}); supabase.auth.signOut(); }}><LogOut size={15}/> 退出登录</button>
   </section></div>;
 }
