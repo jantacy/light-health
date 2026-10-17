@@ -20,7 +20,7 @@ function rangeDays(r: Range) {
 }
 
 export default function Trends({ supabase, userId, goal, targetWeight, version, onPickDay }: Props) {
-  const [range, setRange] = useState<Range>(7);
+  const [range, setRange] = useState<Range>(30);
   const [store, setStore] = useState(() => readTrendStore(userId));
   const days = useMemo(() => rangeDays(range), [range]);
 
