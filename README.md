@@ -193,7 +193,7 @@ curl -s --resolve <域名>:443:127.0.0.1 https://<域名>/   # 在服务器上�
 注意事项：
 
 - 如果前面套了 Cloudflare：源站不要返回 502/504，否则会被换成 Cloudflare 自己的非 JSON 错误页；接口出错统一用 503。
-- 推理模型的推理 token 也计入 `max_tokens`，上限太小会返回空内容（识图和估算已关闭推理，每日一句仍开着）。
+- 推理模型的推理 token 也计入 `max_tokens`，上限太小会返回空内容（识图和估算都已关闭推理）。
 - 页面细节对齐以真机为准：Chromium 和 Playwright WebKit 模拟都显示居中的顶栏问候语，在 iPhone 上仍偏上，最后按真机效果下移了 1px（`.topbar-user .greeting`）。
 - 本机如果通过 Clash 等工具走 TUN 代理，`curl --resolve <IP>` 仍会按域名被转发到 CDN；要测源站，请在服务器上执行。
 - iOS 的启动图要删除主屏幕图标后重新"添加到主屏幕"才会更新。启动图和页面里的品牌图标都用 `public/icon.svg`，换图标时要重新生成 `public/splash/` 下的图片。
