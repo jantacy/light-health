@@ -14,6 +14,7 @@ import Avatar from "./avatar";
 import { photoUrl, prunePhotos } from "@/lib/photo-cache";
 import { applyPending, enqueue, flush, onOutboxChange, readJobs, type MealRow } from "@/lib/outbox";
 import Splash, { refreshQuotes, todayQuote } from "./splash";
+import PullRefresh from "./pull-refresh";
 
 const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
@@ -25,6 +26,13 @@ function writeCache(key: string, value: unknown) {
 }
 
 const STALE_NOTICE = "网络不稳定，显示的是上次加载的数据，正在重试…";
+
+function reloadFresh() {
+  caches.keys()
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith("light-meal-v")).map((k) => caches.open(k).then((c) => c.delete("/", { ignoreSearch: true })))))
+    .catch(() => {})
+    .finally(() => location.reload());
+}
 
 export default function Home() {
   const [supabase] = useState(createClient);
@@ -173,11 +181,21 @@ export default function Home() {
   useEffect(() => {
     if (!newVersion || editing || showSettings) return;
     try { if (sessionStorage.getItem("light-meal:reloaded-for") === newVersion) { setUpdateStuck(true); return; } sessionStorage.setItem("light-meal:reloaded-for", newVersion); } catch {}
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("light-meal-v")).map((k) => caches.open(k).then((c) => c.delete("/", { ignoreSearch: true })))))
-      .catch(() => {})
-      .finally(() => location.reload());
+    reloadFresh();
   }, [newVersion, editing, showSettings]);
+
+  // 下拉刷新：服务器有新版本就重新加载页面（用户主动操作，不受“只自动刷新一次”的限制）；
+  // 没有新版本或连不上服务器，只重新拉取数据，不清缓存（离线时清了缓存会打不开）。
+  async function pullRefresh() {
+    if (process.env.NODE_ENV === "production") {
+      const version = await fetch("/api/version", { cache: "no-store" }).then((r) => r.json()).then((d) => d.version as string).catch(() => "");
+      if (version && version !== process.env.NEXT_PUBLIC_BUILD_ID) { reloadFresh(); return new Promise<void>(() => {}); }
+    }
+    setRefreshKey((k) => k + 1);
+    loadProfile(false);
+    syncNow();
+    await new Promise((r) => setTimeout(r, 600)); // 让“正在刷新”停留一下，看得到有动作
+  }
 
   // 同步提示：从“有待同步”变为“全部同步完”时显示 3 秒。
   useEffect(() => {
@@ -244,6 +262,7 @@ export default function Home() {
     {editing && <MealModal supabase={supabase} userId={session.user.id} date={tab === "day" ? date : todayISO()} initial={editing === "new" ? undefined : editing} photoUrls={photoUrls} onSaved={mealSaved} onDeleted={mealDeleted} onClose={() => setEditing(null)}/>}
     {showSettings && <SettingsModal supabase={supabase} userId={session.user.id} initial={profile} avatarUrl={avatarUrl} onClose={() => setShowSettings(false)} onSaved={(p) => { setProfile(p); setShowSettings(false); flash("资料已保存"); }} onAvatarChanged={(p, url) => { setProfile(p); setAvatarUrl(url); }}/>}
     {viewing && <PhotoViewer src={viewing} onClose={() => setViewing("")}/>}
+    <PullRefresh disabled={!!editing || showSettings || !!viewing} onRefresh={pullRefresh}/>
   </main>;
 }
 
