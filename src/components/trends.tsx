@@ -3,70 +3,39 @@
 import { useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ChevronRight } from "lucide-react";
-import { addDays, dayRange, localDay, shortDate, todayISO, weekdayDate } from "@/lib/date";
-import type { Meal, WeightEntry } from "@/lib/types";
+import { addDays, todayISO, shortDate, weekdayDate } from "@/lib/date";
 import { round1 } from "@/lib/number";
+import { readTrendStore, syncTrends } from "@/lib/trend-store";
 
-type DayRow = Pick<Meal, "eaten_at" | "calories" | "protein_g">;
-type Props = { supabase: SupabaseClient; userId: string; goal: number; targetWeight: number | null; refreshKey: number; onPickDay: (date: string) => void };
+// version：本地趋势数据被首页下拉刷新更新后变化，趋势页重新读取。
+type Props = { supabase: SupabaseClient; userId: string; goal: number; targetWeight: number | null; version: number; onPickDay: (date: string) => void };
 const ranges = [7, 30, 90] as const;
 
-// 本机缓存每个时间范围上次拉到的数据：打开趋势页先画缓存，后台再刷新，和首页一样不用等网络。
-type Cached = { rows: DayRow[]; weights: WeightEntry[] };
-const cacheKey = (userId: string, range: number) => `light-meal:trends:${userId}:${range}`;
-function readCache(key: string): Cached | null {
-  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
-}
-
-export default function Trends({ supabase, userId, goal, targetWeight, refreshKey, onPickDay }: Props) {
+export default function Trends({ supabase, userId, goal, targetWeight, version, onPickDay }: Props) {
   const [range, setRange] = useState<(typeof ranges)[number]>(7);
-  const [rows, setRows] = useState<DayRow[]>(() => readCache(cacheKey(userId, 7))?.rows ?? []);
-  const [weights, setWeights] = useState<WeightEntry[]>(() => readCache(cacheKey(userId, 7))?.weights ?? []);
+  const [store, setStore] = useState(() => readTrendStore(userId));
   const days = useMemo(() => Array.from({ length: range }, (_, i) => addDays(todayISO(), i - range + 1)), [range]);
 
+  // 先画本地数据；本地覆盖不到这个范围时才会真正请求服务端。
   useEffect(() => {
-    const key = cacheKey(userId, range);
-    const cached = readCache(key);
-    if (cached) { setRows(cached.rows); setWeights(cached.weights); }
-    const { start } = dayRange(days[0]);
-    const { end } = dayRange(days[days.length - 1]);
-    Promise.all([
-      supabase.from("meal_records").select("eaten_at, calories, protein_g").gte("eaten_at", start).lt("eaten_at", end),
-      supabase.from("weight_records").select("*").gte("recorded_on", days[0]).order("recorded_on")
-    ]).then(([m, w]) => {
-      if (m.error || w.error) return; // 网络失败时保留缓存的数据
-      const fresh = { rows: (m.data || []) as DayRow[], weights: (w.data || []) as WeightEntry[] };
-      setRows(fresh.rows); setWeights(fresh.weights);
-      try { localStorage.setItem(key, JSON.stringify(fresh)); } catch {}
-    });
-  }, [supabase, userId, range, days, refreshKey]);
+    setStore(readTrendStore(userId));
+    syncTrends(supabase, userId, range).then((next) => { if (next) setStore(next); });
+  }, [supabase, userId, range, version]);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, { calories: number; protein: number }>();
-    for (const r of rows) {
-      const d = localDay(r.eaten_at);
-      const v = map.get(d) ?? { calories: 0, protein: 0 };
-      v.calories += Number(r.calories); v.protein += Number(r.protein_g);
-      map.set(d, v);
-    }
-    return map;
-  }, [rows]);
-
-  const logged = days.filter((d) => byDay.has(d));
-  const avg = (key: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, d) => s + byDay.get(d)![key], 0) / logged.length) : 0;
-  const weightByDay = new Map(weights.map((w) => [w.recorded_on, Number(w.weight_kg)]));
-  const firstW = weights[0], lastW = weights[weights.length - 1];
-  const delta = weights.length > 1 ? round1(Number(lastW.weight_kg) - Number(firstW.weight_kg)) : null;
+  const logged = days.filter((d) => store.days[d]);
+  const avg = (key: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, d) => s + store.days[d][key], 0) / logged.length) : 0;
+  const weightDays = days.filter((d) => store.weights[d] !== undefined);
+  const delta = weightDays.length > 1 ? round1(store.weights[weightDays[weightDays.length - 1]] - store.weights[weightDays[0]]) : null;
 
   return <div className="trends">
     <div className="segmented range-switch">{ranges.map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} 天</button>)}</div>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">CALORIE TREND</span><h2>热量趋势</h2></div></div>
-      <LineChart points={days.map((d) => ({ date: d, value: byDay.get(d)?.calories ?? null }))} unit="kcal" goal={goal} fromZero onPickDay={onPickDay}/>
+      <LineChart points={days.map((d) => ({ date: d, value: store.days[d]?.calories ?? null }))} unit="kcal" goal={goal} fromZero onPickDay={onPickDay}/>
       <div className="trend-stats"><div><small>记录天数</small><strong>{logged.length}<span>/{range}</span></strong></div><div><small>日均热量</small><strong>{avg("calories")}<span>kcal</span></strong></div><div><small>日均蛋白质</small><strong>{avg("protein")}<span>g</span></strong></div></div>
       <p className="weight-hint">没有记录的日子不计入日均。点图上的某一天可查看明细。</p>
     </section>
     <section className="section"><div className="section-heading"><div><span className="eyebrow">WEIGHT TREND</span><h2>体重变化</h2></div>{delta !== null && <div className="weight-current"><strong>{delta > 0 ? `+${delta}` : delta}</strong><small>kg</small></div>}</div>
-      {weights.length > 1 ? <LineChart points={days.map((d) => ({ date: d, value: weightByDay.get(d) ?? null }))} unit="kg" goal={targetWeight ?? undefined} onPickDay={onPickDay}/> : <p className="weight-hint">这段时间记录两次以上体重后显示曲线。</p>}
+      {weightDays.length > 1 ? <LineChart points={days.map((d) => ({ date: d, value: store.weights[d] ?? null }))} unit="kg" goal={targetWeight ?? undefined} onPickDay={onPickDay}/> : <p className="weight-hint">这段时间记录两次以上体重后显示曲线。</p>}
     </section>
   </div>;
 }

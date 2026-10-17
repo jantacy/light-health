@@ -16,6 +16,7 @@ import { applyPending, enqueue, flush, onOutboxChange, readJobs, type MealRow } 
 import Splash, { refreshQuotes, todayQuote } from "./splash";
 import PullRefresh from "./pull-refresh";
 import { round1 } from "@/lib/number";
+import { recordDay, syncTrends } from "@/lib/trend-store";
 
 const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
@@ -60,6 +61,7 @@ export default function Home() {
   const [syncDone, setSyncDone] = useState(false);
   const pendingCount = useRef(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [trendsVersion, setTrendsVersion] = useState(0);
   const [loadFailed, setLoadFailed] = useState(false); // 当天数据没拉到，每 10 秒重试
   const [newVersion, setNewVersion] = useState(""); // 服务器上有比当前页面更新的版本
   const [updateStuck, setUpdateStuck] = useState(false); // 自动刷新过一次仍是旧版本
@@ -90,7 +92,9 @@ export default function Home() {
         return;
       }
       setLoadFailed(false); setNotice((n) => (n === STALE_NOTICE ? "" : n));
-      setMeals(applyPending((m.data || []) as Meal[], readJobs(session.user.id), (x) => localDay(x.eaten_at) === date)); setWeights((w.data || []) as WeightEntry[]);
+      const dayMeals = applyPending((m.data || []) as Meal[], readJobs(session.user.id), (x) => localDay(x.eaten_at) === date);
+      setMeals(dayMeals); setWeights((w.data || []) as WeightEntry[]);
+      recordDay(session.user.id, date, dayMeals, (w.data || []) as WeightEntry[]); setTrendsVersion((v) => v + 1); // 顺带更新趋势页的本地数据
       writeCache(key, { meals: m.data, weights: w.data });
     });
   }, [session, date, supabase, refreshKey]);
@@ -195,6 +199,7 @@ export default function Home() {
     setRefreshKey((k) => k + 1);
     loadProfile(false);
     syncNow();
+    if (session) syncTrends(supabase, session.user.id, 90, true).then((s) => { if (s) setTrendsVersion((v) => v + 1); }); // 同步其他设备录入的数据
     await new Promise((r) => setTimeout(r, 600)); // 让“正在刷新”停留一下，看得到有动作
   }
 
@@ -249,7 +254,7 @@ export default function Home() {
         : pending.size > 0 ? <div className="notice syncing" role="status">正在同步 {pending.size} 条记录，请等待！{retrying && "（网络不稳定，会自动重试）"}</div>
         : syncDone ? <div className="notice" role="status">所有饮食记录已同步！</div>
         : notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>×</button></div>}
-      {tab === "trends" ? <Trends supabase={supabase} userId={session.user.id} goal={GOAL} targetWeight={targets.target_weight ? Number(targets.target_weight) : null} refreshKey={refreshKey} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>
+      {tab === "trends" ? <Trends supabase={supabase} userId={session.user.id} goal={GOAL} targetWeight={targets.target_weight ? Number(targets.target_weight) : null} version={trendsVersion} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>
       <section className="welcome"><div><div className="welcome-meta"><span className="eyebrow">{greetingDate}</span><span className="daily-quote">{quote}</span></div><h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1></div></section>
       <section className="summary-card"><div className="summary-head"><h2>{isToday ? "今日健康" : `${shortDate(date)} 健康`}</h2><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div>
         <WeightPanel latest={weights[0]} date={date} target={targets.target_weight ?? null} gender={targets.gender ?? null} input={weightInput} onInput={setWeightInput} onSubmit={saveWeight}/></section>
