@@ -227,10 +227,10 @@ button.meal-thumb{border:0;padding:0}
 .weight-panel-form{flex:none;display:flex;align-items:center;border:1px solid #ffffff26;background:#ffffff18;border-radius:99px;height:31px;font-size:12px;color:#e8f0e6}
 .weight-panel-form:focus-within{border-color:#ffffff55}
 /* iPhone 上输入框必须 ≥16px 才不会点开时放大页面：用 16px 再缩到 0.75，看起来与日期选择同为 12px */
-.weight-panel-form input{width:118px;margin-right:-29.5px;min-width:0;border:0;background:transparent;color:#e8f0e6;font-size:16px;line-height:24px;padding:0 8px 0 15px;outline:none;transform:scale(.75);transform-origin:left center}
+.weight-panel-form input{width:94px;margin-right:-23.5px;min-width:0;border:0;background:transparent;color:#e8f0e6;font-size:16px;line-height:24px;padding:0 8px 0 15px;outline:none;transform:scale(.75);transform-origin:left center}
 .weight-panel-form input::placeholder{color:#c7d5c7}
 .weight-panel-form input:focus::placeholder{color:transparent}
-.weight-panel-form button{flex:none;white-space:nowrap;border:0;border-left:1px solid #ffffff26;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;font-weight:600;padding:0 11px}
+.weight-panel-form button{flex:none;white-space:nowrap;border:0;border-left:1px solid #ffffff26;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;font-weight:600;padding:0 9px}
 .weight-tip{margin:6px 0 0;font-size:12px;color:#e3ecd9}
 .weight-tip.warn{color:#ffb4a6;text-align:center} /* 深绿卡片上用浅红，不加底框、不加粗 */
 
@@ -251,8 +251,9 @@ button.meal-thumb{border:0;padding:0}
 .trends .trend-stats strong{font-size:16px}
 .trends .weight-hint{margin-top:6px}
 .pull-refresh{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));z-index:25;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.95);box-shadow:0 4px 16px rgba(38,58,50,.12);color:var(--green);font-size:11px;font-weight:600;pointer-events:none}
-/* 今日健康卡片里的日期框和体重记录框同尺寸（138×31）。日期框按最长的“10/16 周五”定宽，箭头贴边、日期居中 */
-.summary-card .date-pill,.weight-panel-form{width:138px;box-sizing:border-box}
-.summary-card .date-pill{height:31px;justify-content:center}
+/* 今日健康卡片里的日期框和体重记录框同尺寸（116×31）。日期框按最长的“10/16 周五”收紧字号和间距，箭头贴边、日期居中 */
+.summary-card .date-pill,.weight-panel-form{width:116px;box-sizing:border-box}
+.summary-card .date-pill{height:31px;justify-content:center;font-size:11px;gap:3.5px;padding:0 5px}
+.summary-card .date-pill button{padding:1px}
 .summary-card .date-pill button:first-child{margin-right:auto}
 .summary-card .date-pill button:last-child{margin-left:auto}
