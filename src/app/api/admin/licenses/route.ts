@@ -1,16 +1,10 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizePhone } from "@/lib/phone";
+import { adminAuthorized as authorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
-
-function authorized(request: Request) {
-  const expected = process.env.LICENSE_ADMIN_SECRET || "";
-  const supplied = request.headers.get("x-license-admin-key") || "";
-  if (!expected || expected.length < 32 || supplied.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(expected), Buffer.from(supplied));
-}
 
 export async function POST(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: "管理密钥不正确。" }, { status: 401 });

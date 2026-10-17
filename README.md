@@ -18,6 +18,7 @@
 | 模块 | 说明 |
 | --- | --- |
 | 登录 | 手机号 + License，管理员在 `/admin/licenses` 签发，无短信、无邮箱 |
+| 管理页 | `/admin`（电脑浏览器）：管理共享食物库（搜索、修改、新增、删除）；按手机号查用户的 License、登录时间、资料和最近 7–90 天的饮食、体重记录（含照片） |
 | 记录一餐 | 照片可选，可多张；上传后自动识别，识别出几种食物就列几行（食物、重量、热量、✓）。也可以不拍照直接手动添加，或添加照片里没有的食物。改名称或重量后点 ✓ 重新计算；清空名称再点即删除。可补录过去的日期 |
 | 今日健康 | 当天摄入汇总（热量 / 蛋白质 / 碳水 / 脂肪，进度按个人热量阈值），前后翻日期；下方是体重栏，见下文 |
 | 饮食记录 | 点记录编辑，点照片看大图；像 iOS 一样左滑露出"删除"（编辑页里也能删） |
@@ -53,6 +54,8 @@ iPhone（PWA）
  └─ 你的域名（CDN → nginx → Next.js）
       ├─ /api/auth/license   手机号 + License 登录，换取 Supabase 会话
       ├─ /api/admin/licenses 管理员签发 License
+      ├─ /api/admin/foods    管理页：食物库增删改查
+      ├─ /api/admin/users    管理页：按手机号查用户和记录
       ├─ /api/analyze        识图（视觉模型，1024px、关闭推理、同图缓存）
       ├─ /api/estimate       按名称 + 重量估算（先查食物库，再问语言模型）
       ├─ /api/quotes         未来 10 天的每日一句（只给旧版前端用，新版本地计算）
@@ -91,7 +94,7 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
 | `user_profiles` | 昵称、性别、生日、头像路径、热量阈值 `calorie_goal`（800–5000，空为 2000）、目标体重 `target_weight`（25–300 kg） | 本人可读；只能改这些资料字段，不能改手机号和账号绑定 |
 | `meal_records` | 一条饮食记录：日期、餐次、总营养、`dishes`（按照片分组的食物明细，每项含名称、库键 `key`、克数、热量、三大营养素；旧记录没有 `key`） | 本人 |
 | `weight_records` | 每天一条体重 | 本人 |
-| `food_library` | 共享食物库，每 100 克营养，含来源 `source`（`cfct` 成分表 / `ai` / `photo` / `manual`）、使用次数 `uses`、待更新标记 `needs_refresh` | 仅服务端 |
+| `food_library` | 共享食物库，每 100 克营养，含来源 `source`（`cfct` 成分表 / `ai` / `photo` / `manual` 管理页手动改过或新增）、使用次数 `uses`、待更新标记 `needs_refresh` | 仅服务端 |
 | `app_settings` | 键值配置，如 `food_refresh_every` | 仅服务端 / SQL |
 | `meal-photos` 桶 | 饮食照片，按用户 ID 分目录 | 本人 |
 | `avatars` 桶 | 头像，按用户 ID 分目录 | 本人 |
@@ -131,7 +134,7 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
   node --env-file=.env.local scripts/import-cfct.mts --apply  # 写入；同时按新的名称规则合并库里已有的同义食物
   ```
 
-- **定期重估**：每保存一条记录，触发器给其中每种食物的 `uses` 加 1（按食物项的 `key`，旧记录按名称）；每满 N 次标记待更新。服务端每 30 分钟认领一批（跳过成分表数据），让模型按"名称，100克"重估，新旧值各取一半。N 默认 30，修改后立即生效：
+- **定期重估**：每保存一条记录，触发器给其中每种食物的 `uses` 加 1（按食物项的 `key`，旧记录按名称）；每满 N 次标记待更新。服务端每 30 分钟认领一批（跳过成分表和手动数据），让模型按"名称，100克"重估，新旧值各取一半。N 默认 30，修改后立即生效：
 
   ```sql
   update public.app_settings set value = '50' where key = 'food_refresh_every';
@@ -221,5 +224,4 @@ curl -s --resolve <域名>:443:127.0.0.1 https://<域名>/   # 在服务器上�
 
 ## 已知限制
 
-- 食物库还没有管理页面，修改数值需要直接改表。
 - 照片从 Supabase Storage 直接加载，首次查看和上传受用户到 Supabase 区域的网络影响。

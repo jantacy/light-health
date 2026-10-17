@@ -164,12 +164,13 @@ create trigger meal_records_count_food_uses after insert on public.meal_records 
 -- 服务端认领待更新的食物（多台服务器同时跑也不会重复处理）。
 create or replace function public.claim_food_refresh(max_rows integer default 10) returns setof public.food_library language sql security definer set search_path = public as $$
   update public.food_library set needs_refresh = false
-   where name in (select name from public.food_library where needs_refresh and source <> 'cfct' order by uses desc limit max_rows for update skip locked)
+   where name in (select name from public.food_library where needs_refresh and source not in ('cfct', 'manual') order by uses desc limit max_rows for update skip locked)
   returning *;
 $$;
 revoke all on function public.claim_food_refresh(integer) from public, anon, authenticated;
 revoke all on function public.count_food_uses() from public, anon, authenticated;
 
 -- 《中国食物成分表标准版（第6版）》导入的权威数据：source = 'cfct'，AI 不覆盖、不重估（导入见 scripts/import-cfct.mts）。
+-- 管理页（/admin）手动修改或新增的记为 source = 'manual'，同样不被 AI 重估。
 alter table public.food_library drop constraint if exists food_library_source_check;
 alter table public.food_library add constraint food_library_source_check check (source in ('ai', 'photo', 'manual', 'cfct'));
