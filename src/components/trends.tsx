@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ChevronRight } from "lucide-react";
 import { addDays, dayRange, localDay, shortDate, todayISO, weekdayDate } from "@/lib/date";
 import type { Meal, WeightEntry } from "@/lib/types";
+import { round1 } from "@/lib/number";
 
 type DayRow = Pick<Meal, "eaten_at" | "calories" | "protein_g">;
 type Props = { supabase: SupabaseClient; goal: number; refreshKey: number; onPickDay: (date: string) => void };
@@ -40,7 +41,7 @@ export default function Trends({ supabase, goal, refreshKey, onPickDay }: Props)
   const avg = (key: "calories" | "protein") => logged.length ? Math.round(logged.reduce((s, d) => s + byDay.get(d)![key], 0) / logged.length) : 0;
   const weightByDay = new Map(weights.map((w) => [w.recorded_on, Number(w.weight_kg)]));
   const firstW = weights[0], lastW = weights[weights.length - 1];
-  const delta = weights.length > 1 ? Math.round((Number(lastW.weight_kg) - Number(firstW.weight_kg)) * 10) / 10 : null;
+  const delta = weights.length > 1 ? round1(Number(lastW.weight_kg) - Number(firstW.weight_kg)) : null;
 
   return <div className="trends">
     <div className="segmented range-switch">{ranges.map((n) => <button key={n} className={range === n ? "active" : ""} onClick={() => setRange(n)}>{n} 天</button>)}</div>
@@ -72,7 +73,7 @@ function LineChart({ points, unit, goal, onPickDay }: { points: Point[]; unit: s
   const sel = active !== null ? points[active] : null;
 
   return <div className="line-chart">
-    <div className="line-chart-info">{sel ? <><span>{weekdayDate(sel.date)}</span><strong>{sel.value === null ? "无记录" : `${Math.round(sel.value * 10) / 10} ${unit}`}</strong><button onClick={() => onPickDay(sel.date)}>查看这天 <ChevronRight size={13}/></button></> : <span>点图表查看某一天</span>}</div>
+    <div className="line-chart-info">{sel ? <><span>{weekdayDate(sel.date)}</span><strong>{sel.value === null ? "无记录" : `${round1(sel.value)} ${unit}`}</strong><button onClick={() => onPickDay(sel.date)}>查看这天 <ChevronRight size={13}/></button></> : <span>点图表查看某一天</span>}</div>
     <div className="line-chart-plot">
       {goal !== undefined && <i className="goal-line" style={{ top: `${y(goal)}%` }}><span>目标 {goal}</span></i>}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d={path} vectorEffect="non-scaling-stroke"/></svg>

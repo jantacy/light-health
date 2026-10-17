@@ -15,6 +15,7 @@ import { photoUrl, prunePhotos } from "@/lib/photo-cache";
 import { applyPending, enqueue, flush, onOutboxChange, readJobs, type MealRow } from "@/lib/outbox";
 import Splash, { refreshQuotes, todayQuote } from "./splash";
 import PullRefresh from "./pull-refresh";
+import { round1 } from "@/lib/number";
 
 const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
@@ -276,7 +277,7 @@ function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }:
   const scrollBefore = useRef<number | null>(null);
   const remember = () => { if (scrollBefore.current === null) scrollBefore.current = window.scrollY; };
   const restore = () => { const top = scrollBefore.current; scrollBefore.current = null; if (top !== null) setTimeout(() => window.scrollTo({ top, behavior: "smooth" }), 60); };
-  const diff = weight !== null && target ? Math.round((weight - Number(target)) * 10) / 10 : null;
+  const diff = weight !== null && target ? round1(weight - Number(target)) : null;
   const limit = diff !== null && diff > 0 ? 5 : gender === "male" ? 5 : 2.5;
   let tip: string, warn = false;
   if (!target) tip = "在设置里填上目标体重，这里会帮你算差额";
@@ -289,11 +290,11 @@ function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }:
     <div className="weight-panel-row">
       <div className="weight-panel-now">
         <span>体重</span>
-        <strong>{weight !== null ? weight.toFixed(1) : "--"}<small> kg</small></strong>
-        {target ? <em>目标 {Number(target).toFixed(1)} kg</em> : null}
+        <strong>{weight !== null ? round1(weight).toFixed(1) : "--"}<small> kg</small></strong>
+        {target ? <em>目标 {round1(Number(target)).toFixed(1)} kg</em> : null}
       </div>
       <form className="weight-panel-form" onSubmit={onSubmit}>
-        <input inputMode="decimal" type="number" step="any" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" onTouchStart={remember} onFocus={remember} onBlur={restore} value={input} onChange={(e) => onInput(e.target.value)}/>
+        <input inputMode="decimal" type="number" step="any" min="20" max="400" placeholder={hint ? `${round1(hint).toFixed(1)} kg` : "kg"} aria-label="记录体重" onTouchStart={remember} onFocus={remember} onBlur={restore} value={input} onChange={(e) => onInput(e.target.value)}/>
         <button type="submit">记录</button>
       </form>
     </div>
