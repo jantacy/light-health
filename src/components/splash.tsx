@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Leaf } from "lucide-react";
 import { fallbackQuote } from "@/lib/quote-pool";
 import { todayISO } from "@/lib/date";
 
@@ -31,7 +30,7 @@ export default function Splash() {
   const [quote, setQuote] = useState("");
   useEffect(() => setQuote(todayQuote()), []);
   return <main className="splash" aria-busy="true">
-    <div className="splash-brand"><span className="brand-mark"><Leaf size={26}/></span><strong>轻食记</strong></div>
+    <div className="splash-brand"><img className="brand-mark" src="/icon.svg" alt=""/><strong>轻食记</strong></div>
     <p className="splash-quote">{quote}</p>
     <span className="splash-dot"/>
   </main>;

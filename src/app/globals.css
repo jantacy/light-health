@@ -225,6 +225,24 @@ button.meal-thumb{border:0;padding:0}
 /* iPhone 上输入框必须 ≥16px 才不会点开时放大页面：用 16px 再缩到 0.75，看起来与日期选择同为 12px */
 .weight-panel-form input{width:84px;margin-right:-21px;border:0;background:transparent;color:#e8f0e6;font-size:16px;line-height:24px;padding:0 8px 0 15px;outline:none;transform:scale(.75);transform-origin:left center}
 .weight-panel-form input::placeholder{color:#c7d5c7}
+.weight-panel-form input:focus::placeholder{color:transparent}
 .weight-panel-form button{border:0;border-left:1px solid #ffffff26;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;font-weight:600;padding:0 11px}
 .weight-tip{margin:6px 0 0;font-size:12px;color:#e3ecd9}
 .weight-tip.warn{display:inline-block;background:#fbeceb;color:#c0392b;font-weight:600;border-radius:8px;padding:5px 9px}
+
+/* 趋势页压缩：两张图表 + 统计尽量在一屏内放下 */
+.trends{padding-top:10px}
+.trends .section{margin-top:14px}
+.trends .section-heading{margin-bottom:8px}
+.trends .section-heading .eyebrow{display:none}
+.trends .section-heading h2{margin:0;font-size:16px}
+.trends .weight-current strong{font-size:16px}
+.trends .line-chart{padding:8px 12px 6px}
+.trends .line-chart-info{min-height:24px}
+.trends .line-chart-info button{padding:3px 8px}
+.trends .line-chart-plot{height:110px;margin-top:8px}
+.trends .line-chart-axis{margin-top:4px;height:16px}
+.trends .trend-stats{margin-top:8px;gap:8px}
+.trends .trend-stats div{padding:7px 10px}
+.trends .trend-stats strong{font-size:16px}
+.trends .weight-hint{margin-top:6px}
