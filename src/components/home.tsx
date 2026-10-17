@@ -222,7 +222,7 @@ export default function Home() {
       {tab === "trends" ? <Trends supabase={supabase} goal={GOAL} refreshKey={refreshKey} onPickDay={(d) => { setSelectedDate(d); setTab("day"); }}/> : <>
       <section className="welcome"><div><div className="welcome-meta"><span className="eyebrow">{greetingDate}</span>{profile?.nickname && <span className="greeting">你好，{profile.nickname}！</span>}</div><h1>{isToday ? "今天也要，" : "那天也要，"}<em>好好吃饭。</em></h1><p className="daily-quote">{quote}</p></div></section>
       <section className="summary-card"><div className="summary-head"><h2>{isToday ? "今日健康" : `${shortDate(date)} 健康`}</h2><div className="date-pill"><button aria-label="查看前一天" onClick={() => shiftDate(-1)}><ChevronLeft size={15}/></button><span className="date-dot"/> {isToday ? "今天" : `${shortDate(date)} ${shortWeekday(date)}`}<button aria-label="查看后一天" onClick={() => shiftDate(1)} disabled={isToday}><ChevronRight size={15}/></button></div></div><div className="calorie-line"><strong>{Math.round(totals.calories).toLocaleString()}</strong><span>kcal</span><small>/ {GOAL.toLocaleString()}</small></div><div className="progress"><i style={{ width: `${Math.min(100, totals.calories / GOAL * 100)}%` }}/></div><div className="macro-grid"><Macro label="蛋白质" value={totals.protein} unit="g" color="sage"/><Macro label="碳水" value={totals.carbs} unit="g" color="sand"/><Macro label="脂肪" value={totals.fat} unit="g" color="rose"/></div>
-        <WeightPanel latest={weights[0]} date={date} isToday={isToday} target={targets.target_weight ?? null} gender={targets.gender ?? null} input={weightInput} onInput={setWeightInput} onSubmit={saveWeight}/></section>
+        <WeightPanel latest={weights[0]} date={date} target={targets.target_weight ?? null} gender={targets.gender ?? null} input={weightInput} onInput={setWeightInput} onSubmit={saveWeight}/></section>
       <section className="section meal-section"><div className="section-heading"><div><span className="eyebrow">YOUR DAY</span><h2>饮食记录 <span className="count">{meals.length}</span></h2></div><button className="text-button" onClick={() => setEditing("new")}><Plus size={17}/> 添加一餐</button></div>
         <div className="meal-list">{meals.length ? meals.map((item) => <SwipeRow key={item.id} onDelete={() => mealDeleted(item.id, storedPaths(item))}><div className="meal-row" role="button" tabIndex={0} onClick={() => setEditing(item)}>{item.image_path && photoUrls[item.image_path] ? <button className="meal-thumb" aria-label="查看照片" onClick={(e) => { e.stopPropagation(); setViewing(photoUrls[item.image_path!]); }}><img src={photoUrls[item.image_path]} alt=""/></button> : <div className="meal-thumb"><img src="/default-meal.svg" alt=""/></div>}<div className="meal-info"><span>{mealLabels[item.meal_type]} <small>{new Date(item.eaten_at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}{item.dishes?.length > 1 && ` · ${item.dishes.length} 道菜`}{pending.has(item.id) && <em className="sync-badge">同步中</em>}</small></span><strong>{item.title}</strong></div><div className="meal-calories"><strong>{Math.round(Number(item.calories))}</strong><small>kcal</small></div></div></SwipeRow>) : <div className="empty-meals"><div className="empty-icon"><Camera size={20}/></div><strong>还没有饮食记录</strong><span>{isToday ? "从今天的第一餐开始吧" : "可以为这一天补记"}</span><button onClick={() => setEditing("new")}>记录一餐 <ChevronRight size={15}/></button></div>}</div>
       </section>
@@ -238,14 +238,15 @@ export default function Home() {
 
 function Macro({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) { return <div className="macro"><span><i className={color}/>{label}</span><strong>{Math.round(value)}<small>{unit}</small></strong></div>; }
 
-// 体重与目标体重的差额：当天没记就用之前最近的一次。高于目标超过 5kg、或低于目标太多（男 5kg、女或未设性别 2.5kg）时标红预警。
-function WeightPanel({ latest, date, isToday, target, gender, input, onInput, onSubmit }: { latest?: WeightEntry; date: string; isToday: boolean; target: number | null; gender: Profile["gender"]; input: string; onInput: (v: string) => void; onSubmit: (e: React.FormEvent) => void }) {
-  const weight = latest ? Number(latest.weight_kg) : null;
+// 体重与目标体重的差额：只算正在查看的那天的记录，没记就显示 --。输入框提示上一次的体重，没有就提示目标体重。高于目标超过 5kg、或低于目标太多（男 5kg、女或未设性别 2.5kg）时标红预警。
+function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }: { latest?: WeightEntry; date: string; target: number | null; gender: Profile["gender"]; input: string; onInput: (v: string) => void; onSubmit: (e: React.FormEvent) => void }) {
+  const weight = latest?.recorded_on === date ? Number(latest.weight_kg) : null;
+  const hint = latest ? Number(latest.weight_kg) : target ? Number(target) : null;
   const diff = weight !== null && target ? Math.round((weight - Number(target)) * 10) / 10 : null;
   const limit = diff !== null && diff > 0 ? 5 : gender === "male" ? 5 : 2.5;
   let tip: string, warn = false;
-  if (weight === null) tip = "记录一下体重，看看离目标还有多远";
-  else if (diff === null) tip = "在设置里填上目标体重，这里会帮你算差额";
+  if (!target) tip = "在设置里填上目标体重，这里会帮你算差额";
+  else if (diff === null) tip = "距目标还差 -- kg";
   else if (Math.abs(diff) > limit) { tip = `预警：已${diff > 0 ? "高" : "低"}于目标 ${Math.abs(diff).toFixed(1)} kg，请注意合理控制体重！`; warn = true; }
   else if (diff > 0) tip = `距目标还差 ${diff.toFixed(1)} kg，请继续加油哦～`;
   else if (diff === 0) tip = "刚好达到目标体重，你真的太棒了！";
@@ -253,12 +254,12 @@ function WeightPanel({ latest, date, isToday, target, gender, input, onInput, on
   return <div className="weight-panel">
     <div className="weight-panel-row">
       <div className="weight-panel-now">
-        <span>体重{latest && latest.recorded_on !== date && <small>（{shortDate(latest.recorded_on)}）</small>}</span>
-        <strong>{weight !== null ? weight.toFixed(1) : "—"}<small> kg</small></strong>
+        <span>体重</span>
+        <strong>{weight !== null ? weight.toFixed(1) : "--"}<small> kg</small></strong>
         {target ? <em>目标 {Number(target).toFixed(1)} kg</em> : null}
       </div>
       <form className="weight-panel-form" onSubmit={onSubmit}>
-        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={isToday ? "今天 kg" : `${shortDate(date)} kg`} aria-label="记录体重" value={input} onChange={(e) => onInput(e.target.value)}/>
+        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" value={input} onChange={(e) => onInput(e.target.value)}/>
         <button type="submit">记录</button>
       </form>
     </div>
