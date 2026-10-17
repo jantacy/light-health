@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import SwRegister from "@/components/sw-register";
+import { SPLASH_DEVICES } from "@/lib/splash-devices";
 
-// iOS 主屏幕启动图：页面绘制前由系统显示，避免黑屏。[逻辑宽, 逻辑高, 像素比]
-const devices = [[375, 667, 2], [414, 896, 2], [375, 812, 3], [390, 844, 3], [393, 852, 3], [428, 926, 3], [430, 932, 3], [402, 874, 3], [440, 956, 3]];
-const startupImage = devices.map(([w, h, r]) => ({
+// iOS 主屏幕启动图：页面绘制前由系统显示，避免黑屏。
+const startupImage = SPLASH_DEVICES.map(([w, h, r]) => ({
   url: `/splash/splash-${w * r}x${h * r}.png`,
   media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`
 }));

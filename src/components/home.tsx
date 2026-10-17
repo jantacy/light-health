@@ -18,6 +18,7 @@ import PullRefresh from "./pull-refresh";
 import { round1 } from "@/lib/number";
 import { recordDay, syncTrends } from "@/lib/trend-store";
 import { applyTheme } from "@/lib/theme";
+import BrandIcon from "./brand-icon";
 
 const DEFAULT_GOAL = 2000; // 没设置热量阈值时用
 
@@ -251,14 +252,14 @@ export default function Home() {
     if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); flash(`已记录 ${isToday ? "今天" : shortDate(date)}的体重`); }
   }
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><img className="brand-mark" src="/icon.svg" alt=""/><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return <main className="setup-screen"><div className="setup-card"><BrandIcon/><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>轻食记</h1><p>请先配置 Supabase 项目，完成后即可开始登录和记录。</p><code>复制 .env.example 为 .env.local 并填入 Supabase URL 与 anon key</code></div></main>;
 
   if (session === undefined) return <Splash/>;
 
-  if (!session) return <main className="auth-screen"><div className="auth-card"><img className="brand-mark" src="/icon.svg" alt=""/><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>好好吃饭，<br/>慢慢记录。</h1><p className="auth-copy">输入受邀手机号和对应的专属 License，打开你的私人饮食记录空间。</p><form onSubmit={signInWithLicense} className="auth-form"><label htmlFor="login-phone">手机号</label><input id="login-phone" type="tel" autoComplete="tel" required placeholder="13800000000" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)}/><label htmlFor="license">License</label><input id="license" type="password" autoComplete="current-password" required placeholder="输入你收到的 License" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)}/><button className="primary-button" type="submit" disabled={loggingIn}>{loggingIn ? "正在验证…" : "登录"} <ChevronRight size={18}/></button></form>{authMessage && <p className="form-message">{authMessage}</p>}<p className="tiny-note">手机号与 License 必须匹配</p></div><div className="auth-decoration"><span>01</span><i/><span>照顾身体，从一餐开始</span></div></main>;
+  if (!session) return <main className="auth-screen"><div className="auth-card"><BrandIcon/><span className="eyebrow">PRIVATE FOOD JOURNAL</span><h1>好好吃饭，<br/>慢慢记录。</h1><p className="auth-copy">输入受邀手机号和对应的专属 License，打开你的私人饮食记录空间。</p><form onSubmit={signInWithLicense} className="auth-form"><label htmlFor="login-phone">手机号</label><input id="login-phone" type="tel" autoComplete="tel" required placeholder="13800000000" value={phoneInput} onChange={(e) => setPhoneInput(e.target.value)}/><label htmlFor="license">License</label><input id="license" type="password" autoComplete="current-password" required placeholder="输入你收到的 License" value={licenseInput} onChange={(e) => setLicenseInput(e.target.value)}/><button className="primary-button" type="submit" disabled={loggingIn}>{loggingIn ? "正在验证…" : "登录"} <ChevronRight size={18}/></button></form>{authMessage && <p className="form-message">{authMessage}</p>}<p className="tiny-note">手机号与 License 必须匹配</p></div><div className="auth-decoration"><span>01</span><i/><span>照顾身体，从一餐开始</span></div></main>;
 
   return <main className="app-shell">
-    <header className="topbar"><a className="wordmark" href="#top"><img className="brand-mark small" src="/icon.svg" alt=""/>轻食记</a><div className="topbar-user">{profile?.nickname && <span className="greeting">你好，<em>{profile.nickname}</em>！</span>}<button className="avatar-button" aria-label="设置" onClick={() => { if (!profile) loadProfile(false); setShowSettings(true); }}><Avatar src={avatarUrl} name={profile?.nickname}/></button></div></header>
+    <header className="topbar"><a className="wordmark" href="#top"><BrandIcon className="brand-mark small"/>轻食记</a><div className="topbar-user">{profile?.nickname && <span className="greeting">你好，<em>{profile.nickname}</em>！</span>}<button className="avatar-button" aria-label="设置" onClick={() => { if (!profile) loadProfile(false); setShowSettings(true); }}><Avatar src={avatarUrl} name={profile?.nickname}/></button></div></header>
     <div className="dashboard" id="top">
       {newVersion ? <div className="notice syncing" role="status">{updateStuck ? "发现新版本，请彻底关闭应用后重新打开！" : editing || showSettings ? "发现新版本，关闭弹窗后自动更新" : "发现新版本，正在更新…"}</div>
         : pending.size > 0 ? <div className="notice syncing" role="status">正在同步 {pending.size} 条记录，请等待！{retrying && "（网络不稳定，会自动重试）"}</div>

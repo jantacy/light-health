@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { quoteForDate } from "@/lib/quote-pool";
 import { todayISO } from "@/lib/date";
+import BrandIcon from "./brand-icon";
 
 // 每日箴言由日期直接算出（见 quote-pool.ts），不用联网。
 export function todayQuote() {
@@ -14,7 +15,7 @@ export default function Splash() {
   const [quote, setQuote] = useState("");
   useEffect(() => setQuote(todayQuote()), []);
   return <main className="splash" aria-busy="true">
-    <div className="splash-brand"><img className="brand-mark" src="/icon.svg" alt=""/><strong>轻食记</strong></div>
+    <div className="splash-brand"><BrandIcon/><strong>轻食记</strong></div>
     <p className="splash-quote">{quote}</p>
     <span className="splash-dot"/>
   </main>;

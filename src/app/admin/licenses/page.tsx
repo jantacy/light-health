@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import BrandIcon from "@/components/brand-icon";
 
 export default function LicenseAdminPage() {
   const [secret, setSecret] = useState("");
@@ -26,5 +27,5 @@ export default function LicenseAdminPage() {
     await navigator.clipboard.writeText(license); setCopied(true);
   }
 
-  return <main className="auth-screen"><section className="auth-card admin-card"><img className="brand-mark" src="/icon.svg" alt=""/><span className="eyebrow">PRIVATE ACCESS</span><h1>签发 License</h1><p className="auth-copy">输入受邀者手机号，服务端会生成与该号码绑定的专属 License。重新签发会立即让旧 License 失效。</p><form className="auth-form" onSubmit={issue}><label htmlFor="admin-secret">管理员密钥</label><input id="admin-secret" type="password" autoComplete="off" required minLength={32} placeholder="服务端 LICENSE_ADMIN_SECRET" value={secret} onChange={(e) => setSecret(e.target.value)}/><label htmlFor="invite-phone">手机号</label><input id="invite-phone" type="tel" autoComplete="off" required placeholder="13800000000" value={phone} onChange={(e) => setPhone(e.target.value)}/><button className="primary-button" disabled={busy}>{busy ? "正在签发…" : "生成 License"}</button></form>{message && <p className="form-message">{message}</p>}{license && <div className="license-result"><code>{license}</code><button type="button" onClick={copyLicense}>{copied ? <Check size={16}/> : <Copy size={16}/>} {copied ? "已复制" : "复制"}</button></div>}<p className="tiny-note">请使用 HTTPS，并妥善保管管理员密钥与签发结果</p></section></main>;
+  return <main className="auth-screen"><section className="auth-card admin-card"><BrandIcon/><span className="eyebrow">PRIVATE ACCESS</span><h1>签发 License</h1><p className="auth-copy">输入受邀者手机号，服务端会生成与该号码绑定的专属 License。重新签发会立即让旧 License 失效。</p><form className="auth-form" onSubmit={issue}><label htmlFor="admin-secret">管理员密钥</label><input id="admin-secret" type="password" autoComplete="off" required minLength={32} placeholder="服务端 LICENSE_ADMIN_SECRET" value={secret} onChange={(e) => setSecret(e.target.value)}/><label htmlFor="invite-phone">手机号</label><input id="invite-phone" type="tel" autoComplete="off" required placeholder="13800000000" value={phone} onChange={(e) => setPhone(e.target.value)}/><button className="primary-button" disabled={busy}>{busy ? "正在签发…" : "生成 License"}</button></form>{message && <p className="form-message">{message}</p>}{license && <div className="license-result"><code>{license}</code><button type="button" onClick={copyLicense}>{copied ? <Check size={16}/> : <Copy size={16}/>} {copied ? "已复制" : "复制"}</button></div>}<p className="tiny-note">请使用 HTTPS，并妥善保管管理员密钥与签发结果</p></section></main>;
 }

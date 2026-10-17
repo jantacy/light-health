@@ -79,6 +79,8 @@ src/lib/photo-cache.ts   照片本地缓存
 public/sw.js             Service Worker
 supabase/schema.sql      数据库、存储桶、RLS、触发器（可重复执行）
 scripts/import-cfct.mts  导入《中国食物成分表》到食物库
+scripts/gen-theme-assets.mjs  生成各主题的图标、manifest、iOS 启动图
+public/themes/           各主题的图标和启动图
 deploy/                  部署脚本、systemd 单元、nginx 配置
 ```
 
@@ -144,10 +146,11 @@ deploy/                  部署脚本、systemd 单元、nginx 配置
 
 设置里可选 6 个预设：青绿（默认）、海蓝、靛紫、暖棕、森绿、石墨。不提供任意取色，也刻意不放红、粉，避免和预警红混淆。
 
-- 只有"主题色"一类会变：主按钮、健康卡片、选中态、日期圆点、聚焦边框、浅色底等，在 `globals.css` 里写成 `var(--c-xxxxxx,#xxxxxx)`（默认值就是原来的青绿）。黑色文字、灰色、分割线、红色预警、营养素圆点等不变。
-- 换主题时把每个颜色的色相拉到目标色相附近（保留原来与主色色相差的 1/4），亮度和饱和度不变，所以深浅层次和默认一致。每个预设都核对过 WCAG 对比度（白字/主色、主色/底色、卡片上的浅色文字），都不低于默认青绿。
-- 选择存在 `user_profiles.theme`，换设备也跟着走；本机另存一份算好的颜色，`layout.tsx` 里的内联脚本在页面绘制前套用，打开时不会先闪一下青绿。App 图标和启动图不随主题变。
-- 新增主题色时，在 `src/lib/theme.ts` 的 `THEMES` 里加一项（目标色相、饱和度系数），并重新核对对比度。
+- 会变的：所有青绿色调的颜色，包括主按钮、健康卡片、选中态、带绿调的深色文字（如"今天也要"）和灰色文字（如日期）、页面底色、分割线、阴影、Logo。在 `globals.css` 里写成 `var(--c-xxxxxx,#xxxxxx)`（默认值就是原来的青绿）。不变的：红色（预警、删除、同步中）、橙色（未确认的热量、同步角标）、营养素三个圆点、白色叠加，以及默认示意图里的沙拉。
+- 换主题时把每个颜色的色相拉到目标色相附近（保留原来与主色色相差的 1/4），亮度和饱和度不变，所以深浅层次和默认一致。每个预设都核对过 WCAG 对比度，和默认青绿持平或更高。
+- 选择存在 `user_profiles.theme`，换设备也跟着走；本机另存一份算好的颜色，`layout.tsx` 里的内联脚本在页面绘制前套用，打开时不会先闪一下青绿。
+- 图标、浏览器顶栏颜色、manifest 和 iOS 启动图也跟着换：每个主题一套放在 `public/themes/<id>/`，由 `scripts/gen-theme-assets.mjs` 生成（默认青绿用 `public/` 下原有文件）。iOS 只在"添加到主屏幕"时读取图标和启动图，所以已添加的要删掉重新添加才会换。
+- 新增主题色时，在 `src/lib/theme.ts` 的 `THEMES` 里加一项（目标色相、饱和度系数），重新核对对比度，再运行 `PLAYWRIGHT_CORE=<playwright-core 路径> node scripts/gen-theme-assets.mjs` 生成素材。
 
 ## 离线与同步
 
@@ -214,7 +217,7 @@ curl -s --resolve <域名>:443:127.0.0.1 https://<域名>/   # 在服务器上�
 - 推理模型的推理 token 也计入 `max_tokens`，上限太小会返回空内容（识图和估算都已关闭推理）。
 - 页面细节对齐以真机为准：Chromium 和 Playwright WebKit 模拟都显示居中的顶栏问候语，在 iPhone 上仍偏上，最后按真机效果下移了 1px（`.topbar-user .greeting`）。
 - 本机如果通过 Clash 等工具走 TUN 代理，`curl --resolve <IP>` 仍会按域名被转发到 CDN；要测源站，请在服务器上执行。
-- iOS 的启动图要删除主屏幕图标后重新"添加到主屏幕"才会更新。启动图和页面里的品牌图标都用 `public/icon.svg`，换图标时要重新生成 `public/splash/` 下的图片。
+- iOS 的启动图要删除主屏幕图标后重新"添加到主屏幕"才会更新。页面里的品牌图标是内联 SVG（`src/components/brand-icon.tsx`，和 `public/icon.svg` 同图形），换图标时要同步改这两处，并重新生成 `public/splash/` 和各主题的素材。
 - 用户反映被自动登出：查 `auth.refresh_tokens`，某个令牌被作废却没有对应的新令牌，说明是旧令牌被重用触发了上面的轮换保护（`auth.audit_log_entries` 在新项目里是空的）。
 
 ## 已知限制

@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <!-- 没有照片时的默认示意图：一碗健康沙拉 -->
-  <rect width="120" height="120" fill="#eef3ea"/>
+  <!-- 没有照片时的默认示意图：一碗健康沙拉。背景透明，由所在容器的主题色底色透出 -->
   <ellipse cx="60" cy="66" rx="44" ry="40" fill="#fff"/>
   <ellipse cx="60" cy="66" rx="36" ry="32" fill="#f4f7f1"/>
   <g fill="#7fb069">
