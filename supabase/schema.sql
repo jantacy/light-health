@@ -52,6 +52,8 @@ create table if not exists public.weight_records (
   created_at timestamptz not null default now(),
   unique (user_id, recorded_on)
 );
+-- 体重存两位小数（显示保留一位）。从 numeric(5,1) 放宽，已有数值不变。
+alter table public.weight_records alter column weight_kg type numeric(5,2);
 create index if not exists weight_records_user_day_idx on public.weight_records (user_id, recorded_on desc);
 alter table public.weight_records enable row level security;
 drop policy if exists "Users read own weights" on public.weight_records;

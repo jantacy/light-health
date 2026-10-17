@@ -230,7 +230,7 @@ export default function Home() {
   }
 
   async function saveWeight(e: React.FormEvent) {
-    e.preventDefault(); const value = Number(weightInput); if (!value || !session) return;
+    e.preventDefault(); const value = Math.round(Number(weightInput) * 100) / 100; if (!value || !session) return; // 输入不限小数位，存两位；显示时保留一位
     const { error } = await supabase.from("weight_records").upsert({ user_id: session.user.id, recorded_on: date, weight_kg: value }, { onConflict: "user_id,recorded_on" });
     if (error) setNotice("体重保存失败，请稍后重试。"); else { setWeightInput(""); setRefreshKey((k) => k + 1); flash(`已记录 ${isToday ? "今天" : shortDate(date)}的体重`); }
   }
@@ -293,7 +293,7 @@ function WeightPanel({ latest, date, target, gender, input, onInput, onSubmit }:
         {target ? <em>目标 {Number(target).toFixed(1)} kg</em> : null}
       </div>
       <form className="weight-panel-form" onSubmit={onSubmit}>
-        <input inputMode="decimal" type="number" step="0.1" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" onTouchStart={remember} onFocus={remember} onBlur={restore} value={input} onChange={(e) => onInput(e.target.value)}/>
+        <input inputMode="decimal" type="number" step="any" min="20" max="400" placeholder={hint ? `${hint.toFixed(1)} kg` : "kg"} aria-label="记录体重" onTouchStart={remember} onFocus={remember} onBlur={restore} value={input} onChange={(e) => onInput(e.target.value)}/>
         <button type="submit">记录</button>
       </form>
     </div>
