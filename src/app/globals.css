@@ -232,7 +232,7 @@ button.meal-thumb{border:0;padding:0}
 .weight-panel-form input:focus::placeholder{color:transparent}
 .weight-panel-form button{border:0;border-left:1px solid #ffffff26;background:transparent;color:#e8f0e6;font-size:12px;line-height:18px;font-weight:600;padding:0 11px}
 .weight-tip{margin:6px 0 0;font-size:12px;color:#e3ecd9}
-.weight-tip.warn{display:inline-block;background:#fbeceb;color:#c0392b;font-weight:600;border-radius:8px;padding:5px 9px}
+.weight-tip.warn{color:#ffb4a6;text-align:center} /* 深绿卡片上用浅红，不加底框、不加粗 */
 
 /* 趋势页压缩：两张图表 + 统计尽量在一屏内放下 */
 .trends{padding-top:10px}

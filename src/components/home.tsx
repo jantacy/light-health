@@ -13,7 +13,7 @@ import SettingsModal, { type Profile } from "./settings-modal";
 import Avatar from "./avatar";
 import { photoUrl, prunePhotos } from "@/lib/photo-cache";
 import { applyPending, enqueue, flush, onOutboxChange, readJobs, type MealRow } from "@/lib/outbox";
-import Splash, { refreshQuotes, todayQuote } from "./splash";
+import Splash, { todayQuote } from "./splash";
 import PullRefresh from "./pull-refresh";
 import { round1 } from "@/lib/number";
 import { recordDay, syncTrends } from "@/lib/trend-store";
@@ -71,7 +71,6 @@ export default function Home() {
   useEffect(() => {
     migrateCookieSession(supabase).then(() => supabase.auth.getSession()).then(({ data }) => setSession(data.session ?? null));
     setQuote(todayQuote());
-    refreshQuotes().then(() => setQuote(todayQuote()));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
